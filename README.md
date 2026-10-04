@@ -64,15 +64,15 @@ every dependency update, and as a smoke subset on every pull request. The table 
 
 | Package | Supported | Oldest, tested | Latest, tested |
 |---|---|---|---|
-| `openai` | `>=6.0.0` | ✅ 6.0.0 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 7.28.0 <sub>(Node 26 · 2026-10-04)</sub> |
-| `@anthropic-ai/sdk` | `>=0.66.0` | ✅ 0.66.0 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 0.131.0 <sub>(Node 26 · 2026-10-04)</sub> |
-| `@google/genai` | `>=1.6.0` | ✅ 1.6.0 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 2.27.0 <sub>(Node 26 · 2026-10-04)</sub> |
-| `@aws-sdk/client-bedrock-runtime` | `>=3.906.0` | ✅ 3.906.0 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 3.1146.0 <sub>(Node 26 · 2026-10-04)</sub> |
-| `vitest` | `>=4.0.1` | ✅ 4.0.1 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 5.0.3 <sub>(Node 22 · 2026-10-04)</sub> |
-| `jest` + `@jest/globals` | `>=29.0.0` | ✅ 29.0.0 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 30.5.2 <sub>(Node 22 · 2026-10-04)</sub> |
-| `@playwright/test` | `>=1.56.0` | ✅ 1.56.0 <sub>(Node 22 · 2026-10-04)</sub> | ✅ 1.63.0 <sub>(Node 22 · 2026-10-04)</sub> |
-| `yaml` | `>=2.0.0` | ✅ 2.0.0 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 2.9.1 <sub>(Node 26 · 2026-10-04)</sub> |
-| `typescript` | `>=6.0.2` | ✅ 6.0.2 <sub>(Node 26 · 2026-10-04)</sub> | ✅ 7.0.2 <sub>(Node 26 · 2026-10-04)</sub> |
+| `openai` | `>=6.0.0` | ✅ 6.0.0 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 7.28.0 <sub>(Node 24, 26 · 2026-10-04)</sub> |
+| `@anthropic-ai/sdk` | `>=0.66.0` | ✅ 0.66.0 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 0.131.0 <sub>(Node 24, 26 · 2026-10-04)</sub> |
+| `@google/genai` | `>=1.6.0` | ✅ 1.6.0 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 2.27.0 <sub>(Node 24, 26 · 2026-10-04)</sub> |
+| `@aws-sdk/client-bedrock-runtime` | `>=3.906.0` | ✅ 3.906.0 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 3.1146.0 <sub>(Node 24, 26 · 2026-10-04)</sub> |
+| `vitest` | `>=4.0.1` | ✅ 4.0.1 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 5.0.3 <sub>(Node 22, 24 · 2026-10-04)</sub> |
+| `jest` + `@jest/globals` | `>=29.0.0` | ✅ 29.0.0 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 30.5.2 <sub>(Node 22, 24 · 2026-10-04)</sub> |
+| `@playwright/test` | `>=1.56.0` | ✅ 1.56.0 <sub>(Node 22, 24 · 2026-10-04)</sub> | ✅ 1.63.0 <sub>(Node 22, 24 · 2026-10-04)</sub> |
+| `yaml` | `>=2.0.0` | ✅ 2.0.0 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 2.9.1 <sub>(Node 24, 26 · 2026-10-04)</sub> |
+| `typescript` | `>=6.0.2` | ✅ 6.0.2 <sub>(Node 24, 26 · 2026-10-04)</sub> | ✅ 7.0.2 <sub>(Node 24, 26 · 2026-10-04)</sub> |
 
 <!-- compat:end -->
 
