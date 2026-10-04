@@ -36,14 +36,16 @@ jobs:
           npx playwright install --with-deps chromium
       - run: npm run check
 
+      # v2 reads the CHANGESETS_OUTPUT file that `changeset publish` (CLI v3) writes, to detect what was
+      # published, push the mock-llm@x.y.z tag and create the GitHub release. (v1 parsed log lines that CLI v3
+      # no longer prints, so it missed the 0.1.0 publish.)
       - id: changesets
-        uses: changesets/action@v1
+        uses: changesets/action@v2
         with:
-          publish: npm run release
-          title: Version Packages
-          commit: 'chore: version packages'
+          publish-script: npm run release
+          pr-title: Version Packages
+          commit-message: 'chore: version packages'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Only for the very first publish (npm can't attach a trusted publisher to a package that
           # doesn't exist yet). Delete the NPM_TOKEN secret once trusted publishing is configured;
           # from then on npm authenticates this workflow via OIDC.

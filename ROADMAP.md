@@ -456,33 +456,36 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 "Supporting version X" therefore means "CI proves the mock works with X".
 
 ### R16. Release pipeline (first public release)
-**Status:** In progress (started 2026-10-04). Local work is done; waiting on the maintainer to publish the repo and npm token (see below)
+**Status:** In progress (started 2026-10-04). 0.1.0 is published; waiting on the maintainer to switch npm to trusted publishing (see below)
 **Goal:** anyone can `npm install -D mock-llm`, and every release is reproducible, verified and traceable to its source.
 **Acceptance criteria**
-- [ ] Git repository initialised with a sensible `.gitignore`, pushed to a public GitHub repo; `package.json` has `repository`, `homepage`, `bugs`, `author`
-      *(local: `git init -b main` and initial commit `c2ffb10` (141 files; no node_modules/dist/tgz/local settings; secret scan clean); metadata points at
-      `github.com/AndrewFooteQA/mock-llm`. **Pending: push to the public repo.**)*
+- [x] Git repository initialised with a sensible `.gitignore`, pushed to a public GitHub repo; `package.json` has `repository`, `homepage`, `bugs`, `author`
+      *(public repo https://github.com/AndrewFooteQA/mock-llm; initial commit `c2ffb10` (141 files; no node_modules/dist/tgz/local settings; secret scan clean))*
 - [x] Package correctness: the `yaml` optional peer dependency is restored (it was found missing on 2026-10-04); `files`/`exports`/`types` verified;
       `npm pack` contents checked in CI (only `dist`, README, LICENSE, CHANGELOG; no tests or examples)
       *(`scripts/check-pack.mjs` checks `npm pack --dry-run`: an allow-list of files, every `exports` target present, zero runtime deps. Output: "60 files,
       81.2 kB packed … ✔ package contents OK". Negative check: a stray `src/mock.ts` with CHANGELOG missing → exit 1 with both named. Run by `pack:check` in the CI `check` job and before every publish.)*
 - [x] CI on every PR/push (GitHub Actions): `npm run check` (typecheck, library tests, playground:check, examples incl. Playwright/Chromium)
       *(`.github/workflows/ci.yml`: a `test` job on Node 22/24/26, plus a `check` job with Chromium installed (full check, then `pack:check`, then `changeset status` on PRs).
-      Local `npm run check` is green: 215 tests, 305 lesson runs, 8/8 examples. **Proof of a green run on GitHub is pending the push.**)*
+      First GitHub run (37217196351) failed on Node 22/24 only: a real fidelity bug (Gemini mid-stream error, see amendments). Fixed in `df817ab`; CI run
+      37217569850 green on every job.)*
 - [x] Changesets: each change carries a changeset; a generated "Version Packages" PR bumps the version and writes `CHANGELOG.md`
       *(`.changeset/config.json`; `release.yml` uses `changesets/action@v1` (Version Packages PR); CI fails a PR with no changeset; CLAUDE.md DoD item 4)*
 - [ ] Publishing from CI only, via npm **trusted publishing** (OIDC, no long-lived token) with **provenance**; the publish job runs only from the release PR merge
-      *(`release.yml`: `id-token: write`, npm upgraded to ≥ 11.5.1, `publishConfig.provenance: true`; `changeset publish` only publishes versions not yet on npm, i.e. after the
-      Version Packages PR merges. **Pending: the first publish (token bootstrap, see the amendment), then trusted-publisher setup and token removal.**)*
+      *(0.1.0 was published from CI (release run 37217569854) with provenance, using the bootstrap token. **Pending maintainer actions:** configure the trusted publisher,
+      set "require 2FA and disallow tokens", and delete the token and secret. After that, the next release is the evidence for tokenless OIDC publishing.)*
 - [x] Pre-publish smoke test: install the packed `.tgz` into a clean temp project; `import 'mock-llm'`, `mock-llm/vitest`, `mock-llm/jest`, `mock-llm/playwright` resolve with types
       *(`scripts/smoke-pack.mjs`: a fresh project installs the tarball offline; a real request goes through the installed package; `tsc --strict` on imports from all 4 entry points.
       Output: "✔ runtime … ✔ types: mock-llm, mock-llm/vitest, mock-llm/jest, mock-llm/playwright". Runs in `pack:check`.)*
 - [x] Post-publish verification: install the **published** version from npm into the examples and run them
       *(`scripts/verify-published.mjs` (`npm run verify:published [version]`): copies each example, pins `mock-llm` to the published version, installs from the registry with retries for
-      propagation, and runs its tests. It runs in `release.yml` after a publish. **It can't be run until 0.1.0 exists on npm.**)*
+      propagation, and runs its tests. For 0.1.0 the CI step was skipped (see the amendment on `changesets/action` v2), so it was run by hand: 8/8 examples pass against
+      `mock-llm@0.1.0` from npm.)*
 - [x] Documented release + semver policy (what's major/minor/patch for us; 0.x while the API settles; `next` dist-tag for pre-releases)
       *(`RELEASING.md`: flow, versioning table, Node support policy, `changeset pre enter next`, deprecate rather than unpublish, the token bootstrap and a post-release checklist)*
-- [ ] First release `0.1.0` published; the npm page shows provenance *(pending the maintainer actions)*
+- [x] First release `0.1.0` published; the npm page shows provenance
+      *(`npm view mock-llm`: version 0.1.0, dist-tag `latest`, `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1`; tag `mock-llm@0.1.0` and
+      the GitHub Release https://github.com/AndrewFooteQA/mock-llm/releases/tag/mock-llm%400.1.0 are on the published commit `df817ab`)*
 - [x] Standard criteria: docs (README install + CONTRIBUTING/RELEASING) · `npm run check`
       *(README "Install" section (Node ≥ 22, peers, 0.x policy, tested SDK versions) and Development links; `CONTRIBUTING.md`; `RELEASING.md`; `CHANGELOG.md` 0.1.0. The Reference page
       notes the requirements and links CHANGELOG/RELEASING; `playground:check` now fails on any broken `/docs/*.md` link (negative check: 404 caught). `npm run check` green.)*
@@ -494,6 +497,12 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
   (steps in RELEASING.md).
 - *Node ≥ 22* (`engines` was `>=20`; Node 20 reached end-of-life on 2026-04-30). CI tests 22, 24 and 26.
 - *Source maps are not shipped* (`src/` isn't in the package, so they would point at missing files).
+- *Fidelity fix found by CI:* on Node 22/24, `fetch` delivered the last SSE chunk and Gemini's bare-JSON mid-stream error in one read, so the SDK threw
+  "Incomplete JSON segment at the end" instead of `ApiError`. The mock now pauses ~50 ms before a mid-stream error frame, as the real API does. Regression test:
+  `gemini: errors › mid-stream error arrives as its own network read, even for a slow reader`. It failed 3/3 on Node 22 before the fix and passed 5/5 after.
+- *The token needed 2FA bypass:* the account has 2FA, so the bootstrap token must have "Bypass 2FA" enabled. The first attempt returned E403 and nothing was published.
+- *`changesets/action` v1 → v2:* v1 parses log lines that Changesets CLI v3 no longer prints. So it published 0.1.0 without noticing: no tag, no GitHub Release,
+  and verification skipped. v2 reads the CLI's `CHANGESETS_OUTPUT` file. The 0.1.0 tag and release were created by hand, and verification was run by hand.
 
 ### R17. Dependency watch & compatibility matrix
 **Status:** Proposed
