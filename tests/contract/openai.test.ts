@@ -25,6 +25,19 @@ describe('openai: chat completions', () => {
     expect(r.id).toMatch(/^chatcmpl-/);
   });
 
+  it("accepts image parts with every detail value, including 'original' (openai 7.28.0)", async () => {
+    // SDK update playbook, PR #5: the SDK widened ChatCompletionContentPartImage detail to include 'original'.
+    mock.default().reply('a cat');
+    for (const detail of ['auto', 'low', 'high', 'original'] as const) {
+      const r = await client().chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'what is this?' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,iVBORw0KGgo=', detail } }] }],
+      });
+      expect(r.choices[0]!.message.content).toBe('a cat');
+      expect(mock.journal.last()!.request.messages[0]!.content.map((p) => p.type)).toEqual(['text', 'image']);
+    }
+  });
+
   it('falls back to a default reply when nothing matches', async () => {
     const r = await ask('anything');
     expect(r.choices[0]!.message.content).toContain('mock');
