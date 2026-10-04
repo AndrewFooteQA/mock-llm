@@ -45,11 +45,7 @@ jobs:
           publish-script: npm run release
           pr-title: Version Packages
           commit-message: 'chore: version packages'
-        env:
-          # Only for the very first publish (npm can't attach a trusted publisher to a package that
-          # doesn't exist yet). Delete the NPM_TOKEN secret once trusted publishing is configured;
-          # from then on npm authenticates this workflow via OIDC.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # No npm token: npm trusts this workflow (trusted publishing, OIDC via `id-token: write`).
 
       - name: Verify the published package against every example
         if: steps.changesets.outputs.published == 'true'

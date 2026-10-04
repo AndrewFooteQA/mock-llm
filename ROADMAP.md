@@ -472,8 +472,9 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 - [x] Changesets: each change carries a changeset; a generated "Version Packages" PR bumps the version and writes `CHANGELOG.md`
       *(`.changeset/config.json`; `release.yml` uses `changesets/action@v1` (Version Packages PR); CI fails a PR with no changeset; CLAUDE.md DoD item 4)*
 - [ ] Publishing from CI only, via npm **trusted publishing** (OIDC, no long-lived token) with **provenance**; the publish job runs only from the release PR merge
-      *(0.1.0 was published from CI (release run 37217569854) with provenance, using the bootstrap token. **Pending maintainer actions:** configure the trusted publisher,
-      set "require 2FA and disallow tokens", and delete the token and secret. After that, the next release is the evidence for tokenless OIDC publishing.)*
+      *(0.1.0 was published from CI (release run 37217569854) with provenance, using the bootstrap token. On 2026-10-04 the maintainer configured the trusted
+      publisher (`release.yml`), revoked the token and deleted the `NPM_TOKEN` secret (`gh secret list` is empty). `release.yml` no longer references any token.
+      **Not yet proven:** a tokenless OIDC publish. That needs the next release.)*
 - [x] Pre-publish smoke test: install the packed `.tgz` into a clean temp project; `import 'mock-llm'`, `mock-llm/vitest`, `mock-llm/jest`, `mock-llm/playwright` resolve with types
       *(`scripts/smoke-pack.mjs`: a fresh project installs the tarball offline; a real request goes through the installed package; `tsc --strict` on imports from all 4 entry points.
       Output: "✔ runtime … ✔ types: mock-llm, mock-llm/vitest, mock-llm/jest, mock-llm/playwright". Runs in `pack:check`.)*

@@ -50,14 +50,16 @@ The workflow uses **npm trusted publishing** (OIDC): npm trusts this repository'
 long-lived token. Requirements are npm CLI ≥ 11.5.1 (the workflow upgrades npm), `id-token: write`, and
 `repository.url` in `package.json` matching the GitHub repo exactly.
 
-### One-time bootstrap (first publish only)
+### One-time bootstrap (done 2026-10-04, kept for reference)
 
-npm can only attach a trusted publisher to a package that already exists, so `0.1.0` is published with a short-lived
-token:
+npm can only attach a trusted publisher to a package that already exists, so `0.1.0` was published with a short-lived
+token. The workflow no longer reads any token. To bootstrap a new package, temporarily add
+`env: { NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} }` to the changesets step:
 
-1. On npmjs.com, create a **granular access token**. Scope: publish, all packages (the package doesn't exist yet).
-   Expiry: 7 days.
-2. Run `gh secret set NPM_TOKEN` in the repo and paste the token. Nobody else needs to see it.
+1. On npmjs.com, create a **granular access token**. Scope: read and write, all packages (the package doesn't exist yet).
+   Enable **Bypass two-factor authentication**, otherwise publishing fails with E403 on a 2FA account. Expiry: 7 days.
+2. In your own terminal, run `gh secret set NPM_TOKEN --repo AndrewFooteQA/mock-llm` and paste the token at the prompt.
+   Never pass it as an argument: it would end up in your shell history.
 3. Push to `main`. The release workflow publishes `0.1.0` (package.json already has that version).
 4. On npmjs.com, go to **mock-llm → Settings → Trusted publishing → GitHub Actions** and enter: owner `AndrewFooteQA`,
    repo `mock-llm`, workflow `release.yml`.
