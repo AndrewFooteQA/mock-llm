@@ -47,6 +47,12 @@ jobs:
           commit-message: 'chore: version packages'
         # No npm token: npm trusts this workflow (trusted publishing, OIDC via `id-token: write`).
 
+      # npm logs why trusted publishing failed (e.g. a trusted-publisher mismatch → E404) only at verbose level,
+      # which goes to its debug log rather than the console.
+      - name: On failure, show npm's OIDC / auth log lines
+        if: failure()
+        run: grep -hiE "oidc|trusted|provenance|E40[134]" ~/.npm/_logs/*.log | tail -40 || true
+
       - name: Verify the published package against every example
         if: steps.changesets.outputs.published == 'true'
         run: npm run verify:published
