@@ -527,16 +527,18 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
       Node types, Changesets, GitHub Actions and "example projects". Root and examples are in the same group, `examples/` is un-ignored, peer ranges are never auto-bumped,
       and there are SDK labels for the diff workflow. Schedule: Mondays before 7am; lockfile maintenance on. Release notes are Renovate's default. `renovate-config-validator`:
       "Config validated successfully". Node lines: see the weekly node-check below. **Pending: the maintainer installs the Renovate app; the first PR is the evidence.**)*
-- [ ] Compatibility matrix in CI: **oldest supported + latest** of each SDK and test framework (current + previous major), on Node 20/22/24/26;
+- [x] Compatibility matrix in CI: **oldest supported + latest** of each SDK and test framework (current + previous major), on Node 20/22/24/26;
       runs on PRs (smoke subset) and weekly (full)
       *(`compat/targets.json` + `scripts/compat.mjs` + `.github/workflows/compat.yml`: PRs run a smoke subset (4 SDKs at their oldest, on Node 24); weekly, on demand and on Renovate PRs
       run the full matrix, 21 jobs (9 targets × oldest/latest, plus everything-latest on Node 22/24/26). Each run works in a temp copy of the repo. Framework targets run the
-      examples outside the repo against the packed tarball. Local run, 2026-10-04: **18/18 pass** (table in README › Compatibility). `actionlint` is clean.
-      **Pending: the first CI run after push.**)*
-- [ ] Weekly **"latest"** job installs the newest release of every SDK/framework (even before Renovate's PR) and opens an issue on failure
+      examples outside the repo against the packed tarball. Local run, 2026-10-04: **18/18 pass**. `actionlint` is clean. **CI: Compatibility run 37233971456
+      (workflow_dispatch, full): 21/21 jobs green**, and the PR smoke subset runs on every PR.)*
+- [x] Weekly **"latest"** job installs the newest release of every SDK/framework (even before Renovate's PR) and opens an issue on failure
       *(`compat.mjs run-all-latest`: every target at latest together, plus every example with its SDKs/frameworks at latest, on each Node line. The workflow's `report`
       job opens or updates a `compat-failure` issue on any failure, or when `node-check` finds a Node line to add or drop, and opens a "Compatibility results" PR with
-      `compat/results.json` and the README table. **Pending: first weekly / `workflow_dispatch` run.**)*
+      `compat/results.json` and the README table. Run 37233971456: the everything-latest jobs passed on Node 22/24/26, and the report job opened PR #3 "Compatibility
+      results" with the merged table. No failures, so no issue was opened. The issue path is exercised by `node-check` in the unit tests and the workflow's shell; it
+      hasn't fired for real yet.)*
 - [ ] **SDK surface diff report:** a script that diffs the relevant parts of each SDK's type definitions between two versions (stream event types, content-block
       types, request parameters, endpoints, error classes) and posts the summary on the Renovate PR
       *(`scripts/sdk-surface-diff.mjs`, plus `.github/workflows/sdk-diff.yml`, which comments once per Renovate PR and updates the comment in place. Real runs: openai 7.25.0 → 7.28.0
@@ -551,9 +553,9 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
       after the Vitest floor moved. Peers: `vitest >=4.0.1`, `@jest/globals >=29`, `@playwright/test >=1.56`, `yaml >=2`, enforced by
       `tests/unit/compat.test.ts › optional peer ranges match the tested floors`. Changeset `compat-matrix.md` (minor, with a migration note).)*
 - [ ] Proven once end to end: a real SDK update PR goes through the playbook (or a deliberately downgraded-then-upgraded SDK as a drill)
-- [ ] Standard criteria: docs · `npm run check`
+- [x] Standard criteria: docs · `npm run check`
       *(README Install → Compatibility section, plus a chunk-interval tip; RELEASING › Compatibility policy and Renovate setup; CONTRIBUTING; the CLAUDE.md playbook and layout;
-      a Reference page note. `npm run check` is green locally: 255 tests, 305 lesson runs, 8/8 examples, compat lint. **Pending: CI green after the push.**)*
+      a Reference page note. `npm run check` is green locally: 255 tests, 305 lesson runs, 8/8 examples, compat lint. CI run 37233944664 is green on `8cfe162`.)*
 **Amendments:**
 - *Node 22/24/26* rather than 20/22/24/26 (Node 20 support was dropped in R16).
 - *What "oldest supported" means.* For a package with real majors (openai, @google/genai, Vitest, Jest, TypeScript), it is the first
@@ -587,6 +589,12 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
   - **TypeScript 6** also needs `--ignoreConfig` in `smoke-pack`.
   - **Runner fixes:** examples run outside the repo, because Vitest 4 picks up a parent `vitest.config.ts`. Playwright 1.56's browser download hung once locally on Node 26
     (it worked on Node 22, cause not investigated). CI runs these targets on Node 24.
+- *What the live Renovate PR (#5, openai 7.25.0 → 7.28.0) exposed.* Both gaps are fixed on `main`:
+  - **The surface diff ignored member types.** The release notes said "allow original image detail", but the diff didn't show it, because only member *names*
+    were compared. It now records the string literals in a member's type (`detail:'original'`), with a regression test.
+  - **CI required a changeset on every PR**, so every Renovate PR failed `check`. `scripts/needs-changeset.mjs` now requires one only when something that
+    ships changed (src/ or package.json release fields), as CLAUDE.md says, with tests.
+  - **Mend installed Renovate in Silent mode** by default. The maintainer switched it to automated PRs with "require config file" (RELEASING.md › Renovate).
 - *Concurrency:* a separate review session edited the working tree during R17 (its changes are tracked as its own changeset and R19). R17 was paused until
   it finished.
 
