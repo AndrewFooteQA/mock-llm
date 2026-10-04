@@ -1,0 +1,17 @@
+{
+  "name": "example-node-service-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "openai": "^7.25.0"
+  },
+  "devDependencies": {
+    "mock-llm": "file:../..",
+    "yaml": "^2.9.1"
+  }
+}

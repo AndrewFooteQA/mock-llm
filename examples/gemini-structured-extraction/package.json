@@ -1,0 +1,15 @@
+{
+  "name": "example-gemini-structured-extraction",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@google/genai": "^2.25.0"
+  },
+  "devDependencies": {
+    "mock-llm": "file:../..",
+    "vitest": "^5.0.3"
+  }
+}

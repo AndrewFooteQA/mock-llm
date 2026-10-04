@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude-stop-check.mjs\"",
+            "timeout": 900,
+            "statusMessage": "Checking definition of done (npm run check)…"
+          }
+        ]
+      }
+    ]
+  }
+}

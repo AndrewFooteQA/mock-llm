@@ -1,0 +1,109 @@
+import { ApiError, GoogleGenAI, Type } from '@google/genai';
+import { describe, expect, it } from 'vitest';
+import { edge, faults } from '../../src/index.js';
+import { useMockLLM } from '../../src/testing/vitest.js';
+
+const mock = useMockLLM({ seed: 7 });
+const MODEL = 'gemini-2.5-flash';
+const ai = () => new GoogleGenAI({ apiKey: 'test', httpOptions: { baseUrl: mock.urls.gemini } });
+
+const weather = {
+  functionDeclarations: [{ name: 'get_weather', parameters: { type: Type.OBJECT, properties: { city: { type: Type.STRING } }, required: ['city'] } }],
+};
+
+describe('gemini: generateContent', () => {
+  it('returns scripted text with realistic shape', async () => {
+    mock.when({ provider: 'gemini', lastUserMessage: 'hello' }).reply('Hi from Gemini!');
+    const r = await ai().models.generateContent({ model: MODEL, contents: 'hello', config: { systemInstruction: 'Be nice.' } });
+    expect(r.text).toBe('Hi from Gemini!');
+    expect(r.candidates![0]!.finishReason).toBe('STOP');
+    expect(r.usageMetadata!.promptTokenCount).toBeGreaterThan(0);
+    expect(mock.journal.last()!.request.system).toBe('Be nice.');
+    expect(mock.journal.last()!.request.model).toBe(MODEL);
+  });
+
+  it('streams text chunks', async () => {
+    mock.when({}).reply('alpha beta gamma');
+    let text = '';
+    for await (const chunk of await ai().models.generateContentStream({ model: MODEL, contents: 'x' })) text += chunk.text ?? '';
+    expect(text).toBe('alpha beta gamma');
+  });
+
+  it('function calling loop', async () => {
+    mock.when({ tool: 'get_weather' }).replyToolCall('get_weather', { city: 'Paris' });
+    mock.when({ hasToolResult: true }).reply('Sunny in Paris.');
+    const first = await ai().models.generateContent({ model: MODEL, contents: 'Weather?', config: { tools: [weather] } });
+    expect(first.functionCalls![0]).toMatchObject({ name: 'get_weather', args: { city: 'Paris' } });
+
+    const second = await ai().models.generateContent({
+      model: MODEL,
+      config: { tools: [weather] },
+      contents: [
+        { role: 'user', parts: [{ text: 'Weather?' }] },
+        { role: 'model', parts: [{ functionCall: { name: 'get_weather', args: { city: 'Paris' } } }] },
+        { role: 'user', parts: [{ functionResponse: { name: 'get_weather', response: { temp: 21 } } }] },
+      ],
+    });
+    expect(second.text).toBe('Sunny in Paris.');
+  });
+
+  it('structured output from responseSchema', async () => {
+    mock.when({ responseFormat: 'json_schema' }).replyFromSchema();
+    const r = await ai().models.generateContent({
+      model: MODEL,
+      contents: 'Give me a recipe',
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, minutes: { type: Type.INTEGER } }, required: ['name', 'minutes'] },
+      },
+    });
+    const parsed = JSON.parse(r.text!);
+    expect(typeof parsed.name).toBe('string');
+    expect(Number.isInteger(parsed.minutes)).toBe(true);
+  });
+
+  it('safety block, truncation and malformed function calls', async () => {
+    mock.when('unsafe').reply(edge.contentFilter());
+    mock.when('long').reply(edge.truncated('a b c d e f'));
+    mock.when('bad tool').reply(edge.malformedToolArgs('get_weather'));
+    expect((await ai().models.generateContent({ model: MODEL, contents: 'unsafe' })).candidates![0]!.finishReason).toBe('SAFETY');
+    expect((await ai().models.generateContent({ model: MODEL, contents: 'long' })).candidates![0]!.finishReason).toBe('MAX_TOKENS');
+    const r = await ai().models.generateContent({ model: MODEL, contents: 'bad tool', config: { tools: [weather] } });
+    expect(r.candidates![0]!.finishReason).toBe('MALFORMED_FUNCTION_CALL');
+    expect(r.functionCalls).toBeUndefined();
+  });
+});
+
+describe('gemini: errors', () => {
+  it('native error envelopes become ApiError with status', async () => {
+    mock.when('busy').fail(faults.rateLimit({ retryAfter: 0 }));
+    mock.when('down').fail(faults.overloaded());
+    const busy = await ai().models.generateContent({ model: MODEL, contents: 'busy' }).catch((e) => e);
+    expect(busy).toBeInstanceOf(ApiError);
+    expect(busy.status).toBe(429);
+    expect(busy.message).toContain('RESOURCE_EXHAUSTED');
+    const down = await ai().models.generateContent({ model: MODEL, contents: 'down' }).catch((e) => e);
+    expect(down.status).toBe(503);
+  });
+
+  it('mid-stream error chunk raises ApiError', async () => {
+    mock.when({}).fail(faults.streamError({ afterChunks: 2, error: { kind: 'overloaded' } }));
+    const run = async () => {
+      for await (const _ of await ai().models.generateContentStream({ model: MODEL, contents: 'x' }));
+    };
+    await expect(run()).rejects.toMatchObject({ status: 503 });
+  });
+});
+
+describe('gemini: other endpoints', () => {
+  it('countTokens, embedContent and models.list', async () => {
+    const n = await ai().models.countTokens({ model: MODEL, contents: 'hello world' });
+    expect(n.totalTokens).toBeGreaterThan(0);
+    const e = await ai().models.embedContent({ model: 'gemini-embedding-001', contents: ['a', 'b'] });
+    expect(e.embeddings).toHaveLength(2);
+    expect(e.embeddings![0]!.values!.length).toBe(768);
+    const names: string[] = [];
+    for await (const m of await ai().models.list()) names.push(m.name!);
+    expect(names).toContain(`models/${MODEL}`);
+  });
+});

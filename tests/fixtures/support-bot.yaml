@@ -1,0 +1,28 @@
+# Example scenario file: scripted support-bot behaviour for QA.
+rules:
+  - name: refund
+    when: { lastUserMessage: "/refund/i" }
+    reply: Refunds take 5 business days.
+
+  - name: weather-agent
+    when: { tool: get_weather }
+    steps:
+      - toolCall: { name: get_weather, input: { city: Paris } }
+      - reply: It is sunny in Paris.
+
+  - name: flaky-once
+    when: { lastUserMessage: flaky }
+    once: true
+    fail: { rateLimit: { retryAfter: 0 } }
+
+  - name: weird-output
+    when: { lastUserMessage: weird }
+    edge: unicode
+    inject: " [INJECTED]"
+
+scenarios:
+  vip:
+    template: "Welcome back, VIP! You said: {{lastUserMessage}}"
+
+default:
+  reply: Sorry, I can only help with refunds.

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Acme chat</title></head>
+  <body>
+    <h1>Acme assistant</h1>
+    <form id="chat">
+      <label>Message <input name="message" autocomplete="off" /></label>
+      <button type="submit">Send</button>
+      <button type="button" id="stream">Send (streaming)</button>
+    </form>
+    <div id="messages" aria-live="polite"></div>
+
+    <h2>Bring your own key</h2>
+    <p>Calls the OpenAI API directly from the browser with your key.</p>
+    <label>API key <input id="key" value="sk-demo" /></label>
+    <button type="button" id="suggest">Suggest a title</button>
+    <div id="title" aria-live="polite"></div>
+
+    <script type="module">
+      const form = document.getElementById('chat');
+      const messages = document.getElementById('messages');
+      const add = (text) => { const p = document.createElement('p'); p.textContent = text; messages.append(p); return p; };
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = form.message.value;
+        const r = await fetch('/api/chat', { method: 'POST', body: JSON.stringify({ message }) });
+        const body = await r.json();
+        add(r.ok ? body.reply : 'The assistant is unavailable right now.');
+      });
+
+      document.getElementById('stream').addEventListener('click', async () => {
+        const p = add('');
+        const r = await fetch('/api/stream', { method: 'POST', body: JSON.stringify({ message: form.message.value }) });
+        if (!r.ok) return void (p.textContent = 'The assistant is unavailable right now.');
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          p.textContent += decoder.decode(value, { stream: true });
+        }
+      });
+
+      document.getElementById('suggest').addEventListener('click', async () => {
+        const out = document.getElementById('title');
+        try {
+          const r = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${document.getElementById('key').value}` },
+            body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'Suggest a title for my store page' }] }),
+          });
+          out.textContent = (await r.json()).choices[0].message.content;
+        } catch {
+          out.textContent = 'Could not reach OpenAI.';
+        }
+      });
+    </script>
+  </body>
+</html>

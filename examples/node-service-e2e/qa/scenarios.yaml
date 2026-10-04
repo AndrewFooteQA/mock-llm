@@ -1,0 +1,20 @@
+# QA scenarios for the Acme assistant. Edit these without touching any code.
+# Load with: createMockLLM({ scenarioFiles: ['qa/scenarios.yaml'] })
+rules:
+  - name: refunds
+    when: { lastUserMessage: "/refund/i" }
+    # QA also asserts what the service sends (checked by mock.assertExpectations()).
+    expectRequest: { system: "/Acme Store assistant/" }
+    reply: Refunds are processed within 5 business days of receiving your return.
+
+  - name: opening-hours
+    when: { lastUserMessage: "/hours|open/i" }
+    reply: We're open 9am to 6pm, Monday to Saturday.
+
+  - name: flaky-upstream
+    when: { lastUserMessage: flaky }
+    once: true
+    fail: { overloaded: {} }
+
+default:
+  reply: I'm not sure about that. Let me connect you with a human.

@@ -1,0 +1,109 @@
+{
+  "name": "mock-llm",
+  "version": "0.1.0",
+  "description": "In-process mock of LLM provider APIs (OpenAI, Anthropic, Gemini, Bedrock) for testing apps with the official SDKs \u2014 no tokens spent.",
+  "license": "MIT",
+  "author": "AndrewFooteQA (https://github.com/AndrewFooteQA)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AndrewFooteQA/mock-llm.git"
+  },
+  "homepage": "https://github.com/AndrewFooteQA/mock-llm#readme",
+  "bugs": {
+    "url": "https://github.com/AndrewFooteQA/mock-llm/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vitest": {
+      "types": "./dist/testing/vitest.d.ts",
+      "import": "./dist/testing/vitest.js"
+    },
+    "./jest": {
+      "types": "./dist/testing/jest.d.ts",
+      "import": "./dist/testing/jest.js"
+    },
+    "./playwright": {
+      "types": "./dist/testing/playwright.d.ts",
+      "import": "./dist/testing/playwright.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "playground": "npm run build && node playground/server.mjs",
+    "test:examples": "node scripts/test-examples.mjs",
+    "playground:check": "npm run build && node playground/check.mjs",
+    "check": "npm run typecheck && npm test && npm run playground:check && npm run test:examples",
+    "pack:check": "npm run build && node scripts/check-pack.mjs && node scripts/smoke-pack.mjs",
+    "changeset": "changeset",
+    "release": "npm run pack:check && changeset publish",
+    "verify:published": "node scripts/verify-published.mjs"
+  },
+  "keywords": [
+    "anthropic",
+    "fault-injection",
+    "jest",
+    "llm",
+    "mock",
+    "openai",
+    "playwright",
+    "qa",
+    "testing",
+    "vitest"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "peerDependencies": {
+    "@jest/globals": ">=29",
+    "@playwright/test": ">=1.40",
+    "vitest": ">=1",
+    "yaml": ">=2"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    },
+    "@jest/globals": {
+      "optional": true
+    },
+    "@playwright/test": {
+      "optional": true
+    },
+    "yaml": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1145.0",
+    "@changesets/cli": "^3.0.3",
+    "@google/genai": "^2.25.0",
+    "@jest/globals": "^30.5.2",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "jest": "^30.5.2",
+    "openai": "^7.25.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "yaml": "^2.9.1"
+  }
+}

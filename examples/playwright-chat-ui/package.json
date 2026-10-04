@@ -1,0 +1,17 @@
+{
+  "name": "example-playwright-chat-ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "playwright test",
+    "posttest": "node tests/check-expected-failures.mjs"
+  },
+  "dependencies": {
+    "openai": "^7.25.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "mock-llm": "file:../.."
+  }
+}

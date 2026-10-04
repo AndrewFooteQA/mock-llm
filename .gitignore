@@ -1,0 +1,11 @@
+node_modules
+dist
+*.log
+.claude/.dod-state.json
+.claude/settings.local.json
+test-results
+playwright-report
+.vitest
+*.tgz
+.DS_Store
+.smoke

@@ -1,0 +1,12 @@
+{
+  "name": "example-claude-code-cli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node run.mjs",
+    "test": "node run.mjs --check"
+  },
+  "devDependencies": {
+    "mock-llm": "file:../.."
+  }
+}
