@@ -77,7 +77,13 @@ export function parseDeclarations(text) {
         }
       } else if (top && depth === top.depth + 1 && top.kind !== 'namespace' && top.kind !== 'module') {
         const m = line.match(/^\s*(?:(?:readonly|static|private|protected|public|abstract|get|set|async)\s+)*(['"]?)([\w$-]+)\1\??\s*[:(<=,]/);
-        if (m && !KEYWORDS.has(m[2])) top.sym.members.add(m[2] + (/^\s*[^:]*\(/.test(line.slice(m.index + m[0].length - 1)) && m[0].trim().endsWith('(') ? '()' : ''));
+        if (m && !KEYWORDS.has(m[2])) {
+          top.sym.members.add(m[2] + (/^\s*[^:]*\(/.test(line.slice(m.index + m[0].length - 1)) && m[0].trim().endsWith('(') ? '()' : ''));
+          // String literals in the member's type (`detail?: 'auto' | 'low'`): a new allowed value is a wire change too.
+          // Only the declaration line is read, so a union spread over several lines is reported by member name only.
+          const type = line.slice(m.index + m[0].length);
+          for (const lit of type.match(/'[^']*'|"[^"]*"/g) ?? []) top.sym.members.add(`${m[2]}:${lit.replace(/"/g, "'")}`);
+        }
       }
     }
 
