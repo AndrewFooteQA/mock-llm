@@ -29,6 +29,9 @@ Every change ships with:
 
 ## Pull requests
 
+- Dependency updates come from Renovate. Handle them with the SDK update playbook in
+  [`CLAUDE.md`](CLAUDE.md#sdk-updates-dependency-prs).
+
 - CI must pass: tests on Node 22/24/26, the full check, the package check, and a changeset present.
 - Larger features go through [`ROADMAP.md`](ROADMAP.md): acceptance criteria are agreed first, and the item is signed off
   by the maintainer before the next one starts.

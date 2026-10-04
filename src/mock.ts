@@ -49,7 +49,7 @@ export interface MockLLMOptions {
   strict?: boolean;
   /** USD per 1M tokens by model id / id prefix, merged over the built-in Claude prices. */
   pricing?: PriceTable;
-  /** Scenario files (JSON/YAML) loaded on start(). */
+  /** Scenario files (JSON/YAML) loaded on start() and re-applied by every reset(), so they act as a per-file baseline. */
   scenarioFiles?: string[];
   /** Record each raw HTTP exchange in `journal` entries' `wire` field (default true, capped at 256 KB per body). */
   recordWire?: boolean;
@@ -121,6 +121,8 @@ export class MockLLM {
   private rules: Rule[] = [];
   private fallback?: Rule;
   private scenarios = new Map<string, Rule>();
+  /** `options.scenarioFiles`, parsed once on start() and re-applied by reset(). */
+  private baselineFiles: Array<{ path: string; file: ScenarioFile }> = [];
   private rng: Rng;
   private latencyRng: Rng;
   private chaosOptions?: ChaosOptions;
@@ -249,11 +251,15 @@ export class MockLLM {
     if (!r.pass) throw new ExpectationError(r.message());
   }
 
-  /** Clear rules, scenarios, chaos and the journal (server keeps running). */
+  /**
+   * Clear rules, scenarios, chaos and the journal (server keeps running). Rules from `options.scenarioFiles`
+   * are re-applied fresh (sequence positions and `.times()` counts start over); `load()`ed ones are cleared.
+   */
   reset(): void {
     this.rules = [];
     this.fallback = undefined;
     this.scenarios.clear();
+    for (const { path, file } of this.baselineFiles) applyScenarioFile(this, file, path);
     this.chaosOptions = this.options.chaos;
     this.journal.clear();
     this.state.clear();
@@ -263,7 +269,12 @@ export class MockLLM {
 
   async start(): Promise<this> {
     if (this.server) return this;
-    for (const f of this.options.scenarioFiles ?? []) await this.load(f);
+    this.baselineFiles = [];
+    for (const path of this.options.scenarioFiles ?? []) {
+      const file = await readScenarioFile(path);
+      applyScenarioFile(this, file, path);
+      this.baselineFiles.push({ path, file });
+    }
     const onRequest = (req: Req, res: Res) => {
       this.handle(req, res).catch((err) => {
         if (!res.headersSent) head(res, 500, { 'content-type': 'application/json' });
@@ -419,7 +430,7 @@ export class MockLLM {
       }
       // Keep the raw body even if validation rejects it, so failures are debuggable.
       entry.request = { ...ir, raw: body };
-      ir = adapter.parse(endpoint, body, headers, path, this.state);
+      ir = parseRequest(adapter, endpoint, body, headers, path, this.state);
       entry.request = ir;
 
       if (this.options.apiKeys) {
@@ -593,7 +604,7 @@ export class MockLLM {
           // recognises its bare-JSON error when it fills a read on its own (Node ≤ 24's fetch merges reads).
           await sleep(STREAM_ERROR_GAP_MS, res);
           if (closed(res)) return;
-          const frame = adapter.streamError(cut.error, ctx, ir);
+          const frame = adapter.streamError(cut.error, ctx, ir, i);
           await write(res, frame);
           CHUNKS.get(res)?.(frame);
           return void res.end();
@@ -766,6 +777,19 @@ function resolveProvider(pathname: string, headers: Record<string, string>): { p
   }
   if (pathname.startsWith('/v1/')) return { provider: 'openai', path: pathname };
   return null;
+}
+
+/**
+ * Parse with the adapter. A malformed body that trips the parser (e.g. `messages: [null]`) is a 400 the real
+ * API would send, not a mock crash: an internal 500 would make the SDK retry and raise the wrong error class.
+ */
+function parseRequest(adapter: Adapter, endpoint: Endpoint, body: any, headers: Record<string, string>, path: string, state: Map<string, unknown>): IRRequest {
+  try {
+    return adapter.parse(endpoint, body, headers, path, state);
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError({ kind: 'bad_request', message: `Invalid request body (mock-llm could not read it: ${(err as Error)?.message ?? err}).` });
+  }
 }
 
 function computeUsage(inputTokens: number, response: IRResponse): IRUsage {

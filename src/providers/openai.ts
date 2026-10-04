@@ -165,8 +165,8 @@ export const openaiAdapter: Adapter = {
     return { contentType: 'text/event-stream; charset=utf-8', headers: requestId(ctx), chunks };
   },
 
-  streamError(error, _ctx, req) {
-    if (req?.path === RESPONSES) return responsesStreamError(envelope(error).error);
+  streamError(error, _ctx, req, sent = 0) {
+    if (req?.path === RESPONSES) return responsesStreamError(envelope(error).error, sent);
     return sse({ error: envelope(error).error });
   },
 

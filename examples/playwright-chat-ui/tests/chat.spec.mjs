@@ -47,8 +47,10 @@ test.describe('Acme chat (server calls the LLM)', () => {
   });
 
   test('renders partial text while the answer is still streaming', async ({ page, llm }) => {
-    // Exact chunks with a fixed pause let the test observe the UI mid-stream.
-    await llm.load({ default: { reply: { chunks: ['Checking ', 'your order', '… it shipped!'] }, chunkIntervalMs: 600 } });
+    // Exact chunks with a fixed pause let the test observe the UI mid-stream. Keep the pause longer than one of
+    // Playwright's assertion retry intervals (they back off to 1s), or toHaveText can poll before and after the
+    // intermediate state and miss it, as Playwright 1.56 does with a 600 ms pause.
+    await llm.load({ default: { reply: { chunks: ['Checking ', 'your order', '… it shipped!'] }, chunkIntervalMs: 1200 } });
 
     await page.goto('/');
     await page.getByLabel('Message').fill('Where is my order?');

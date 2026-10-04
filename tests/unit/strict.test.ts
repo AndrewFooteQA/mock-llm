@@ -150,5 +150,9 @@ describe('useMockLLM({ strict: true })', () => {
     expect(results['unscripted request is swallowed by the app'].status).toBe('failed');
     expect(results['unscripted request is swallowed by the app'].failureMessages.join('\n')).toContain('UNEXPECTED LLM REQUEST');
     expect(results['scripted request passes'].status).toBe('passed');
+    // An unmet expectation doesn't hide the strict-mode report: both are in the failure.
+    const both = results['unmet expectation and unscripted request are both reported'];
+    expect(both.status).toBe('failed');
+    expect(both.failureMessages.join('\n')).toMatch(/SCENARIO EXPECTATION FAILED[\s\S]*UNEXPECTED LLM REQUEST/);
   });
 });

@@ -44,8 +44,29 @@ npx changeset pre exit           # when ready for the stable release
 
 `latest` only ever points at a stable version.
 
+## Compatibility policy
+
+What mock-llm supports is defined in `compat/targets.json` and proven by the compatibility matrix
+(`.github/workflows/compat.yml`, `scripts/compat.mjs`). The README's Compatibility table is generated from its results.
+
+- **Range per dependency:** from `oldest` to the latest release. `oldest` is the first release of the previous major. For
+  packages that are 0.x or have had a single major for years, it is the first release at least 12 months old. It is raised
+  when an older release can't work, with the reason recorded in `floor`.
+- **Review floors quarterly.** Move single-major and 0.x floors forward to "≈ 12 months old", and re-run the matrix.
+- **Version bumps:**
+  - Raising a floor or a peer range (narrower support) is `minor`.
+  - Supporting a new SDK release with mock changes is `patch` when it only adds fields, `minor` when it changes mock-llm's
+    own API.
+  - Dropping a Node line is `minor`.
+- **Node:** every even-numbered line from its release until end of life. The weekly matrix run checks Node's release
+  schedule and opens an issue when a line should be added or dropped.
+- **Weekly run:** results land as a "Compatibility results" PR (`compat/results.json` and the README table). Failures open
+  or update an issue labelled `compat-failure`.
+
 ## Repository settings
 
+- **Renovate:** install the [Renovate GitHub App](https://github.com/apps/renovate) for this repository. It reads
+  `renovate.json` and opens grouped dependency PRs on Monday mornings.
 - **Settings → Actions → General → Workflow permissions:** enable **Allow GitHub Actions to create and approve pull
   requests**. Otherwise the Version Packages PR fails with "GitHub Actions is not permitted to create or approve pull
   requests". PRs opened with the workflow token don't trigger CI on their own, but the release workflow runs the full check

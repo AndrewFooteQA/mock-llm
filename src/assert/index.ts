@@ -1,5 +1,5 @@
 import type { CostReport, JournalEntry } from '../core/journal.js';
-import { lastUserText, matchModel } from '../core/rules.js';
+import { lastUserText, matchModel, regexTest } from '../core/rules.js';
 import type { Endpoint, IRMessage, IRRequest, Provider } from '../core/types.js';
 
 /**
@@ -377,14 +377,14 @@ function isAsymmetric(v: unknown): v is AsymmetricMatcher {
 function matchText(expected: TextExpectation, actual: string | undefined): boolean {
   if (actual === undefined) return false;
   if (isAsymmetric(expected)) return expected.asymmetricMatch(actual);
-  if (expected instanceof RegExp) return expected.test(actual);
+  if (expected instanceof RegExp) return regexTest(expected, actual);
   return actual.includes(expected);
 }
 
 /** Partial deep match (like toMatchObject), with RegExp and asymmetric matcher support. */
 export function matchValue(expected: unknown, actual: unknown): boolean {
   if (isAsymmetric(expected)) return expected.asymmetricMatch(actual);
-  if (expected instanceof RegExp) return typeof actual === 'string' && expected.test(actual);
+  if (expected instanceof RegExp) return typeof actual === 'string' && regexTest(expected, actual);
   if (Array.isArray(expected)) {
     return Array.isArray(actual) && actual.length === expected.length && expected.every((v, i) => matchValue(v, actual[i]));
   }

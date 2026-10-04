@@ -201,9 +201,9 @@ export function streamResponses(req: IRRequest, res: IRResponse, ctx: RenderCont
   return chunks;
 }
 
-/** In-stream error event for the Responses API. */
-export function responsesStreamError(error: { message: string; type: string; code: string | null; param: string | null }): string {
-  return sse({ type: 'error', sequence_number: 0, code: error.code ?? error.type, message: error.message, param: error.param }, 'error');
+/** In-stream error event for the Responses API; `sequence` continues the stream's numbering (one event per chunk). */
+export function responsesStreamError(error: { message: string; type: string; code: string | null; param: string | null }, sequence = 0): string {
+  return sse({ type: 'error', sequence_number: sequence, code: error.code ?? error.type, message: error.message, param: error.param }, 'error');
 }
 
 function textOf(content: unknown): string {

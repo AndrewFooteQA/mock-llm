@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, expect } from 'vitest';
 import { MockLLM, type MockLLMOptions } from '../mock.js';
-import { llmMatchers, type MockLLMMatchers } from './matchers.js';
+import { llmMatchers, runAfterTestChecks, type MockLLMMatchers } from './matchers.js';
 
 /**
  * Start one mock per test file, reset rules + journal after each test, stop at the end.
@@ -12,11 +12,11 @@ import { llmMatchers, type MockLLMMatchers } from './matchers.js';
 export function useMockLLM(options: MockLLMOptions = {}): MockLLM {
   const mock = new MockLLM(options);
   beforeAll(() => mock.start());
-  afterEach(() => {
-    // In strict mode an unscripted request fails the test, even if the app swallowed the error.
+  afterEach(async () => {
+    // Scenario expectations always fail the test when unmet; in strict mode an unscripted request does too,
+    // even if the app swallowed the error. Both are reported when both fail.
     try {
-      mock.assertExpectations(); // scenario expectations always fail the test when unmet
-      if (options.strict) mock.assertNoUnmatched();
+      await runAfterTestChecks([() => mock.assertExpectations(), ...(options.strict ? [() => mock.assertNoUnmatched()] : [])]);
     } finally {
       mock.reset();
     }

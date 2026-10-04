@@ -42,8 +42,8 @@ export interface Adapter {
   render(req: IRRequest, res: IRResponse, ctx: RenderContext): HttpReply;
   /** Streaming chat response as a list of wire chunks (SSE frames, or binary frames). */
   stream(req: IRRequest, res: IRResponse, ctx: RenderContext): { contentType: string; headers?: Record<string, string>; chunks: Array<string | Uint8Array> };
-  /** An in-stream error frame (sent mid-stream by `faults.streamError`). */
-  streamError(error: ErrorSpec, ctx: RenderContext, req?: IRRequest): string | Uint8Array;
+  /** An in-stream error frame (sent mid-stream by `faults.streamError`), after `sent` stream chunks. */
+  streamError(error: ErrorSpec, ctx: RenderContext, req?: IRRequest, sent?: number): string | Uint8Array;
   /** HTTP error in the provider's native envelope. */
   error(error: ErrorSpec, ctx: RenderContext): HttpReply;
   /** Non-chat endpoints (models, embeddings, token counting). */

@@ -1,0 +1,136 @@
+name: Compatibility
+
+# The compatibility matrix (ROADMAP R17, scripts/compat.mjs, compat/targets.json):
+#  - pull requests: smoke subset (each provider SDK at its oldest supported release)
+#  - Renovate PRs, weekly, on demand: full matrix (every SDK / framework / TypeScript at oldest and latest, plus
+#    everything-latest on every Node line). The weekly run also checks Node's release schedule, records the results
+#    (compat/results.json → README table) in a PR, and opens an issue when something fails.
+on:
+  pull_request:
+  schedule:
+    - cron: '0 5 * * 1' # Mondays 05:00 UTC, before Renovate's Monday PRs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }} # untrusted (a PR branch name): only ever used via the environment
+        run: |
+          kind=smoke
+          if [ "$EVENT" != pull_request ] || [[ "$HEAD_REF" == renovate/* ]]; then kind=full; fi
+          echo "matrix=$(node scripts/compat.mjs plan $kind)" >> "$GITHUB_OUTPUT"
+          echo "Matrix: $kind"
+
+  run:
+    needs: plan
+    name: ${{ matrix.target }} ${{ matrix.spec }} (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Run
+        env:
+          TARGET: ${{ matrix.target }}
+          SPEC: ${{ matrix.spec }}
+        run: |
+          if [ "$TARGET" = all ]; then node scripts/compat.mjs run-all-latest --out result.json
+          else node scripts/compat.mjs run "$TARGET" "$SPEC" --out result.json; fi
+      - name: Keep the result
+        if: always()
+        env:
+          NAME: ${{ matrix.target }}-${{ matrix.spec }}-${{ matrix.node }}
+        run: |
+          mkdir -p out
+          [ -f result.json ] && cp result.json "out/$(echo "$NAME" | tr '/@' '__').json" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compat-${{ strategy.job-index }}
+          path: out/
+          if-no-files-found: ignore
+
+  # Weekly / on demand only: record results, check Node lines, report failures.
+  report:
+    needs: run
+    if: always() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the results branch
+      pull-requests: write # open the results PR
+      issues: write # open the failure issue
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v5
+        with:
+          path: results
+          pattern: compat-*
+          merge-multiple: true
+      - name: Summarise
+        id: summary
+        run: |
+          node -e '
+            const fs = require("fs");
+            const rs = fs.existsSync("results") ? fs.readdirSync("results").map((f) => JSON.parse(fs.readFileSync("results/" + f, "utf8"))) : [];
+            const failed = rs.filter((r) => !r.ok);
+            const lines = rs.map((r) => `| ${r.ok ? "✅" : "❌"} | \`${r.target}\` | ${r.spec} | ${typeof r.resolved === "string" ? r.resolved : Object.entries(r.resolved ?? {}).map(([k, v]) => k + "@" + v).join(", ")} | ${r.node} | ${r.failures.join("<br>")} |`);
+            const md = ["| | Target | Spec | Version | Node | Failures |", "|---|---|---|---|---|---|", ...lines].join("\n");
+            fs.writeFileSync("summary.md", md + "\n");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `failed=${failed.length}\nmissing=${rs.length === 0}\n`);
+          '
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Node release schedule
+        id: node
+        run: node scripts/compat.mjs node-check | tee node-check.txt || echo "outdated=true" >> "$GITHUB_OUTPUT"
+      - name: Record results (PR)
+        run: |
+          node scripts/compat.mjs report results
+          node scripts/compat.mjs readme
+          if git diff --quiet -- compat/results.json README.md; then echo "No change in results."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C compat/results
+          git add compat/results.json README.md
+          git commit -m "Compatibility results $(date -u +%F)"
+          git push -f origin compat/results
+          gh pr view compat/results --json state -q .state 2>/dev/null | grep -q OPEN \
+            || gh pr create --head compat/results --title "Compatibility results" --body-file summary.md
+      - name: Open or update the failure issue
+        if: steps.summary.outputs.failed != '0' || steps.node.outputs.outdated == 'true' || steps.summary.outputs.missing == 'true'
+        run: |
+          {
+            echo "The [compatibility matrix run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) found problems."
+            echo "Triage each one with the SDK update playbook in CLAUDE.md › SDK updates."
+            echo
+            cat summary.md
+            echo
+            echo '```'; cat node-check.txt; echo '```'
+          } > issue.md
+          gh label create compat-failure --color B60205 --description "Compatibility matrix failure" 2>/dev/null || true
+          n=$(gh issue list --label compat-failure --state open --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body-file issue.md
+          else gh issue create --title "Compatibility matrix failing ($(date -u +%F))" --label compat-failure --body-file issue.md; fi

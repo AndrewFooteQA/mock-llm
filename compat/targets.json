@@ -1,0 +1,83 @@
+{
+  "$comment": "Supported range per dependency, proven by scripts/compat.mjs (see ROADMAP R17 and RELEASING.md › Compatibility policy). 'oldest' is the supported floor; 'latest' is resolved from npm at run time. Raising a floor is a minor release.",
+  "node": [
+    22,
+    24,
+    26
+  ],
+  "targets": {
+    "openai": {
+      "kind": "sdk",
+      "packages": [
+        "openai"
+      ],
+      "oldest": "6.0.0",
+      "floor": "first release of the previous major"
+    },
+    "@anthropic-ai/sdk": {
+      "kind": "sdk",
+      "packages": [
+        "@anthropic-ai/sdk"
+      ],
+      "oldest": "0.66.0",
+      "floor": "first release at least 12 months old (0.x)"
+    },
+    "@google/genai": {
+      "kind": "sdk",
+      "packages": [
+        "@google/genai"
+      ],
+      "oldest": "1.6.0",
+      "floor": "previous major, raised to 1.6.0: the first release with ApiError (1.4.0 added GEMINI_API_KEY)"
+    },
+    "@aws-sdk/client-bedrock-runtime": {
+      "kind": "sdk",
+      "packages": [
+        "@aws-sdk/client-bedrock-runtime"
+      ],
+      "oldest": "3.906.0",
+      "floor": "first release at least 12 months old (single major)"
+    },
+    "vitest": {
+      "kind": "framework",
+      "packages": [
+        "vitest"
+      ],
+      "oldest": "4.0.1",
+      "floor": "previous major, raised to 4.0.1: a fresh install of 4.0.0 resolves a Vite 7 release it cannot run (\"Unknown method: getBuiltins\"), with or without mock-llm"
+    },
+    "jest": {
+      "kind": "framework",
+      "packages": [
+        "jest",
+        "@jest/globals"
+      ],
+      "oldest": "29.0.0",
+      "floor": "first release of the previous major"
+    },
+    "@playwright/test": {
+      "kind": "playwright",
+      "packages": [
+        "@playwright/test"
+      ],
+      "oldest": "1.56.0",
+      "floor": "first release at least 12 months old (single major)"
+    },
+    "yaml": {
+      "kind": "peer",
+      "packages": [
+        "yaml"
+      ],
+      "oldest": "2.0.0",
+      "floor": "first release of the current major (1.x predates scenario files)"
+    },
+    "typescript": {
+      "kind": "types",
+      "packages": [
+        "typescript"
+      ],
+      "oldest": "6.0.2",
+      "floor": "first release of the previous major"
+    }
+  }
+}

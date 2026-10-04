@@ -59,7 +59,7 @@ export const bedrockAdapter: Adapter = {
       if (body?.input?.converse) return parseConverse(body.input.converse, base);
       const inner = body?.input?.invokeModel?.body;
       requireField(inner !== undefined, 'Either input.converse or input.invokeModel must be provided.');
-      return parseInvoke(typeof inner === 'string' ? JSON.parse(inner) : inner, base);
+      return parseInvoke(typeof inner === 'string' ? invokeBodyJson(inner) : inner, base);
     }
     const req = op!.startsWith('converse') ? parseConverse(body, base) : parseInvoke(body, base);
     return { ...req, stream };
@@ -319,4 +319,17 @@ function usageHeaders(ctx: RenderContext): Record<string, string> {
     'x-amzn-bedrock-output-token-count': String(ctx.usage.outputTokens),
     'x-amzn-bedrock-invocation-latency': '1',
   };
+}
+
+/**
+ * CountTokens' `input.invokeModel.body` is a blob, so the SDK sends it base64-encoded. A raw JSON string
+ * (hand-built requests) is accepted too: `{` can't start base64.
+ */
+function invokeBodyJson(body: string): unknown {
+  const text = body.trimStart().startsWith('{') ? body : Buffer.from(body, 'base64').toString('utf8');
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new ApiError({ kind: 'bad_request', message: 'The provided request is not valid: input.invokeModel.body is not a valid model request body.' });
+  }
 }

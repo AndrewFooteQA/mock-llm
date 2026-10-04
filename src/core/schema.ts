@@ -40,8 +40,9 @@ function gen(s0: any, root: any, rng: Rng, depth: number, key: string): unknown 
   if ('const' in s) return s.const;
   if (Array.isArray(s.enum) && s.enum.length) return s.enum[rng.int(s.enum.length)];
   if (Array.isArray(s.anyOf ?? s.oneOf)) {
-    const options = (s.anyOf ?? s.oneOf).filter((o: any) => typeOf(resolve(o, root)) !== 'null');
-    return gen(options[0] ?? {}, root, rng, depth, key);
+    const all = s.anyOf ?? s.oneOf;
+    const options = all.filter((o: any) => typeOf(resolve(o, root)) !== 'null');
+    return gen(options[0] ?? all[0] ?? {}, root, rng, depth, key);
   }
   if (Array.isArray(s.allOf)) {
     const merged = s.allOf.map((o: any) => resolve(o, root)).reduce(
@@ -60,18 +61,14 @@ function gen(s0: any, root: any, rng: Rng, depth: number, key: string): unknown 
     }
     case 'array': {
       if (depth > 6) return [];
-      const min = s.minItems ?? 1;
+      const min = s.minItems ?? Math.min(1, s.maxItems ?? 1);
       const max = Math.max(min, Math.min(s.maxItems ?? 3, min + 2));
       const n = min + rng.int(max - min + 1);
       return Array.from({ length: n }, () => gen(s.items ?? {}, root, rng, depth + 1, key));
     }
     case 'integer':
-    case 'number': {
-      const min = s.minimum ?? (s.exclusiveMinimum !== undefined ? s.exclusiveMinimum + 1 : 0);
-      const max = s.maximum ?? (s.exclusiveMaximum !== undefined ? s.exclusiveMaximum - 1 : min + 100);
-      const v = min + rng.next() * (max - min);
-      return typeOf(s) === 'integer' ? Math.round(v) : Math.round(v * 100) / 100;
-    }
+    case 'number':
+      return fakeNumber(s, rng, typeOf(s) === 'integer');
     case 'boolean':
       return rng.next() < 0.5;
     case 'null':
@@ -81,6 +78,29 @@ function gen(s0: any, root: any, rng: Rng, depth: number, key: string): unknown 
     default:
       return fakeString({}, rng, key);
   }
+}
+
+/** A number inside the schema's bounds (draft-04 boolean and draft-06+ numeric exclusive bounds). */
+function fakeNumber(s: any, rng: Rng, integer: boolean): number {
+  let lo = typeof s.minimum === 'number' ? s.minimum : -Infinity;
+  let hi = typeof s.maximum === 'number' ? s.maximum : Infinity;
+  let loOpen = s.exclusiveMinimum === true;
+  let hiOpen = s.exclusiveMaximum === true;
+  if (typeof s.exclusiveMinimum === 'number' && s.exclusiveMinimum >= lo) [lo, loOpen] = [s.exclusiveMinimum, true];
+  if (typeof s.exclusiveMaximum === 'number' && s.exclusiveMaximum <= hi) [hi, hiOpen] = [s.exclusiveMaximum, true];
+  // Unbounded sides default to a 0..100 range next to whatever bound is given.
+  if (lo === -Infinity) lo = hi >= 0 ? 0 : hi - 100;
+  if (hi === Infinity) hi = lo + 100;
+  const v = lo + rng.next() * (hi - lo);
+  if (integer) {
+    const min = loOpen ? Math.floor(lo) + 1 : Math.ceil(lo);
+    const max = hiOpen ? Math.ceil(hi) - 1 : Math.floor(hi);
+    return min > max ? min : Math.min(max, Math.max(min, Math.round(v))); // min > max: unsatisfiable, best effort
+  }
+  const inside = (x: number) => (loOpen ? x > lo : x >= lo) && (hiOpen ? x < hi : x <= hi);
+  const rounded = Math.round(v * 100) / 100;
+  if (inside(rounded)) return rounded;
+  return inside(v) ? v : (lo + hi) / 2;
 }
 
 function fakeString(s: any, rng: Rng, key: string): string {
@@ -106,19 +126,25 @@ function fakeString(s: any, rng: Rng, key: string): string {
   return out;
 }
 
-/** Break a conforming value: drop the first required property, else flip a type. */
+/**
+ * Break a conforming value so it really fails validation: drop the first required property, else give a typed
+ * property the wrong type, else (no required or typed properties) return a non-object.
+ */
 function violate(s0: any, value: unknown, root: any): unknown {
   const s = resolve(s0, root);
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const obj = { ...(value as Record<string, unknown>) };
-    const req: string[] = s.required ?? Object.keys(obj);
-    if (req[0] !== undefined) {
-      const k = req[0];
-      const t = typeOf(resolve(s.properties?.[k] ?? {}, root));
-      // Wrong type is more interesting than a missing key when there's only one field.
-      if (req.length > 1 || t === undefined) delete obj[k];
-      else obj[k] = t === 'string' ? 12345 : 'not-a-' + t;
+    const typeOfProp = (k: string) => typeOf(resolve(s.properties?.[k] ?? {}, root));
+    const req: string[] = (s.required ?? []).filter((k: string) => k in obj);
+    // Wrong type is more interesting than a missing key when there's only one required field.
+    if (req.length > 1 || (req.length === 1 && typeOfProp(req[0]!) === undefined)) {
+      delete obj[req[0]!];
+      return obj;
     }
+    const k = req[0] ?? Object.keys(obj).find((key) => typeOfProp(key) !== undefined);
+    if (k === undefined) return 'not-an-object';
+    const t = typeOfProp(k)!;
+    obj[k] = t === 'string' ? 12345 : 'not-a-' + t;
     return obj;
   }
   if (Array.isArray(value)) return 'not-an-array';

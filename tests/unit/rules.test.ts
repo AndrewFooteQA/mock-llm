@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MockLLM } from '../../src/index.js';
+import { assertions, matchValue, MockLLM } from '../../src/index.js';
 
 const post = (base: string, body: unknown, headers: Record<string, string> = {}) =>
   fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) }).then(
@@ -83,6 +83,27 @@ describe('rule engine', () => {
       await post(mock.urls.base, chat('x'));
       expect(mock.journal.all().map((e) => e.endpoint)).toEqual(['unknown', 'chat']);
       expect(mock.journal.count({ endpoint: 'chat' })).toBe(1);
+    } finally {
+      await mock.stop();
+    }
+  });
+
+  it('a RegExp with the g or y flag matches every request, not every other one', async () => {
+    const mock = await new MockLLM().start();
+    try {
+      mock.when(/refund/gi).reply('R');
+      mock.when({ lastUserMessage: /order/y }).reply('O');
+      await mock.load({ rules: [{ when: { lastUserMessage: '/invoice/gi' }, reply: 'I' }] });
+      const got = [];
+      for (const q of ['refund', 'refund', 'refund', 'order 1', 'order 2', 'invoice', 'invoice']) got.push(text(await post(mock.urls.base, chat(q))));
+      expect(got).toEqual(['R', 'R', 'R', 'O', 'O', 'I', 'I']);
+
+      // Assertions reuse the same RegExp too.
+      const re = /refund/g;
+      expect(assertions.toHaveReceivedPrompt(mock, re).pass).toBe(true);
+      expect(assertions.toHaveReceivedPrompt(mock, re).pass).toBe(true);
+      expect(matchValue({ text: re }, { text: 'refund' })).toBe(true);
+      expect(matchValue({ text: re }, { text: 'refund' })).toBe(true);
     } finally {
       await mock.stop();
     }

@@ -74,6 +74,37 @@ no test changes, or no README or playground changes, it blocks once more with a 
 why the change needs none. If the check is still failing and you have no further fix, stop and tell the user what's
 failing. The hook won't loop. Nothing is re-run when no files changed since the last passing check.
 
+## SDK updates (dependency PRs)
+
+Renovate opens one PR per ecosystem (`renovate.json`). On a provider SDK PR, the **SDK surface diff** comment lists what
+changed in the SDK's types (stream events, content blocks, parameters, endpoints, errors). The **full compatibility
+matrix** runs (`.github/workflows/compat.yml`). Work through every SDK, test-framework or TypeScript update like this,
+and record the decision in a PR comment:
+
+1. **Read** the surface diff comment, the release notes in the PR body, and any failing matrix job.
+2. **Classify** the update as one or more of:
+   - **No impact.** Nothing in the diff touches what the mock renders or parses, and the matrix is green. Merge.
+   - **Breaking.** The SDK now expects something the mock doesn't send, or sends something the mock can't parse: a
+     failing contract test, a new required field, a renamed event, a changed error class. Fix it **in the same PR**,
+     following the definition of done: a contract test through that SDK, then docs and examples. If older SDK
+     releases still in range behave differently, gate only the SDK-side assertion with `sdkAtLeast()`
+     (`tests/helpers/sdk-version.ts`). Never gate an assertion about what the mock sends.
+   - **New feature to support.** The API gained something users will want to test (a content-block type, a stream event,
+     an endpoint, a parameter that changes responses). Don't build it in the dependency PR. Add a roadmap item with
+     acceptance criteria and link it from the PR. Merge the update if nothing is broken.
+   - **Deprecation.** Something the mock implements is deprecated. Note it in the PR. When the SDK removes it, the
+     mock keeps serving it for as long as older SDK releases in the supported range use it.
+3. **Floors.** If an older release in the supported range can no longer work (e.g. the mock needs a newer error class),
+   raise its `oldest` in `compat/targets.json` with the reason in `floor`. That's a `minor` changeset. Peer ranges in
+   `package.json` follow the tested floors of Vitest, Jest, Playwright and yaml.
+4. **Record** the classification and links (roadmap item, fix commit) in a PR comment before merging.
+
+Never guess wire formats from the diff alone. Read the SDK's source in `node_modules` (see Rules of the road).
+
+The matrix can be run locally: `npm run compat -- run <target> <oldest|latest|x.y.z>` (targets in
+`compat/targets.json`), or `npm run compat -- run-all-latest`. Each run works in a temporary copy of the repo, and runs
+examples outside the repo against the packed tarball.
+
 ## Layout
 
 ```
@@ -88,7 +119,8 @@ src/testing/       mock-llm/vitest + mock-llm/jest adapters (lifecycle + matcher
 tests/unit|contract  library tests (vitest.config.ts restricts the root run to tests/)
 playground/        docs + live tutorial (server.mjs, public/*, check.mjs)
 examples/          standalone starter projects, each with its own package.json and tests
-scripts/           repo tooling (test-examples.mjs)
+scripts/           repo tooling: test-examples, pack checks, verify-published, compat (matrix), sdk-surface-diff
+compat/            targets.json (supported ranges + floors), results.json (last matrix results → README table)
 ```
 
 ## Rules of the road

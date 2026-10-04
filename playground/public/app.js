@@ -809,6 +809,7 @@ async function renderReference() {
     <h2 id="Install">Install & set up</h2>
     <div data-slot="install"></div>
     <p>Requirements: Node ≥ 22, ESM. There are no runtime dependencies. <code>yaml</code>, <code>vitest</code>, <code>@jest/globals</code> and <code>@playwright/test</code> are optional peers, needed only for the feature that uses each one. The package is 0.x, so a minor release may change APIs; see <a href="/docs/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a>. Releases are published from CI with npm provenance (<a href="/docs/RELEASING.md" target="_blank" rel="noopener"><code>RELEASING.md</code></a>).</p>
+    <p><strong>Supported SDK and framework versions</strong> are proven by a weekly compatibility matrix. It runs each provider SDK, test framework and TypeScript at its oldest supported and latest release. The results table is in the README's <a href="/docs/README.md#compatibility" target="_blank" rel="noopener"><code>Compatibility</code></a> section.</p>
 
     <h2 id="Options">createMockLLM(options)</h2>
     <table class="grid"><tbody>
@@ -821,7 +822,7 @@ async function renderReference() {
       ${row('strict', 'Unscripted chat requests get a native 400 and fail the test (<code>assertNoUnmatched()</code>, run automatically by <code>useMockLLM({ strict: true })</code>).')}
       ${row('onUnmatched', "<code>'reply'</code> (default canned reply) or <code>'error'</code> (400 without failing the test).")}
       ${row('pricing', 'USD per 1M tokens by model id / id fragment, merged over built-in Claude prices.')}
-      ${row('scenarioFiles', 'YAML / JSON scenario files loaded on start.')}
+      ${row('scenarioFiles', 'YAML / JSON scenario files loaded on start and re-applied by every <code>reset()</code> (a baseline for every test).')}
       ${row('recordWire', 'Record raw HTTP in <code>journal</code> entries (default on).')}
       ${row('contextWindow', '<code>{ [modelId | glob]: tokens }</code>: oversized prompts get the native context-length error, before any rule. Tokens are <b>approximate</b> (~4 chars/token: system, messages incl. history, tool definitions; output not counted). Exact id wins, then the longest glob.')}
     </tbody></table>
@@ -846,7 +847,7 @@ async function renderReference() {
       ${row('replyTemplate', '<code>{{lastUserMessage}}</code>, <code>{{system}}</code>, <code>{{model}}</code>, <code>{{provider}}</code>')}
       ${row('replyEcho · replyLorem · replyJson', 'Echo the last user message · seeded filler · JSON text')}
       ${row('replyToolCall · replyToolCalls', 'One or parallel tool calls; a string input simulates malformed args')}
-      ${row('replyFromSchema({ violate })', 'JSON generated from the request schema; <code>violate</code> breaks it')}
+      ${row('replyFromSchema({ violate })', 'JSON generated from the request schema; <code>violate</code> breaks it (always invalid: drops a required field, else a wrong type)')}
       ${row('replyToolCallFromSchema(name)', 'Tool args generated from the tool schema')}
       ${row('fail(fault)', 'Any fault below')}
       ${row('inject(text, { position })', 'Add text to every reply from this rule')}
@@ -888,7 +889,7 @@ async function renderReference() {
       ${row('mock.assertNoUnmatched()', 'Throws <code>UnmatchedRequestError</code> listing unscripted requests (entries carry <code>unmatched: true</code>)')}
       ${row('mock.assertExpectations()', 'Throws <code>ExpectationError</code> naming each unmet expectation step (entries carry <code>expectations</code>)')}
       ${row('GET /__mock/info · GET /__mock/journal', 'URLs, strict flag and pricing; the raw journal (out-of-process tests)')}
-      ${row('POST /__mock/reset · POST /__mock/load', 'Clear everything; add rules from a scenario-file object. Client: <code>new RemoteMockLLM(url)</code>')}
+      ${row('POST /__mock/reset · POST /__mock/load', 'Clear everything (rules from <code>scenarioFiles</code> are re-applied); add rules from a scenario-file object. Client: <code>new RemoteMockLLM(url)</code>')}
     </tbody></table>
 
     <h2 id="Events">Events: <code>mock.on(event, listener)</code></h2>
@@ -918,7 +919,7 @@ async function renderReference() {
     <table class="grid"><tbody>
       ${row('mock.urls.openai', '<code>/v1/chat/completions</code>, <code>/v1/responses</code>, <code>/v1/embeddings</code>, <code>/v1/models</code>')}
       ${row('mock.urls.anthropic', '<code>/v1/messages</code>, <code>/v1/messages/count_tokens</code>, <code>/v1/models</code>')}
-      ${row('mock.urls.gemini', '<code>/v1beta/models/{m}:generateContent | streamGenerateContent | countTokens | embedContent</code>, plus Vertex paths')}
+      ${row('mock.urls.gemini', '<code>/v1beta/models/{m}:generateContent | streamGenerateContent | countTokens | embedContent</code>, plus Vertex paths (incl. <code>:predict</code> embeddings)')}
       ${row('mock.urls.bedrock', '<code>/model/{id}/converse | converse-stream | invoke | invoke-with-response-stream | count-tokens</code>')}
     </tbody></table>
   </div>`);

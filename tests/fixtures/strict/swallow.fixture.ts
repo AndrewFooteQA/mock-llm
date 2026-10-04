@@ -24,3 +24,9 @@ it('scripted request passes', async () => {
   mock.when('order').reply('It shipped.');
   await forgivingApp(client(), 'Where is my order?');
 });
+
+it('unmet expectation and unscripted request are both reported', async () => {
+  await mock.load({ rules: [{ when: { lastUserMessage: 'refund' }, expectRequest: { system: 'Be brief.' }, reply: 'ok' }] });
+  await forgivingApp(client(), 'refund please'); // no system prompt: the expectation fails…
+  await forgivingApp(client(), 'Where is my order?'); // …and this request is unscripted
+});

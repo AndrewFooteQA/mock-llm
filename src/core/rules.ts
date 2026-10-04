@@ -365,7 +365,16 @@ function globToRegExp(glob: string): RegExp {
 
 function test(m: TextMatch, value: string | undefined): boolean {
   if (value === undefined) return false;
-  return typeof m === 'string' ? value.includes(m) : m.test(value);
+  return typeof m === 'string' ? value.includes(m) : regexTest(m, value);
+}
+
+/**
+ * `re.test(value)` from the start of the string every time. A `g` / `y` RegExp otherwise keeps `lastIndex`
+ * between calls, so the same matcher would match every other request.
+ */
+export function regexTest(re: RegExp, value: string): boolean {
+  re.lastIndex = 0;
+  return re.test(value);
 }
 
 export function matches(m: Matcher, req: IRRequest): boolean {

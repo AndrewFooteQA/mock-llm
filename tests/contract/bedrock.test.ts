@@ -2,6 +2,7 @@ import {
   BedrockRuntimeClient,
   ConverseCommand,
   ConverseStreamCommand,
+  CountTokensCommand,
   InvokeModelCommand,
   InvokeModelWithResponseStreamCommand,
   ServiceUnavailableException,
@@ -126,6 +127,28 @@ describe('bedrock: InvokeModel (model-native bodies)', () => {
     }
     expect(text).toBe('streamed claude');
     expect(metrics).toMatchObject({ outputTokenCount: expect.any(Number) });
+  });
+});
+
+describe('bedrock: CountTokens', () => {
+  it('counts an InvokeModel body (sent base64-encoded) and a Converse input alike', async () => {
+    const messages: Message[] = [{ role: 'user', content: [{ text: 'How many tokens is this sentence?' }] }];
+    const invokeBody = { anthropic_version: 'bedrock-2023-05-31', max_tokens: 10, messages: [{ role: 'user', content: 'How many tokens is this sentence?' }] };
+    const invoke = await client().send(new CountTokensCommand({ modelId: CLAUDE, input: { invokeModel: { body: new TextEncoder().encode(JSON.stringify(invokeBody)) } } }));
+    const converse = await client().send(new CountTokensCommand({ modelId: CLAUDE, input: { converse: { messages } } }));
+    expect(invoke.inputTokens).toBeGreaterThan(0);
+    expect(invoke.inputTokens).toBe(converse.inputTokens);
+    expect(mock.journal.all().map((e) => [e.endpoint, e.status])).toEqual([
+      ['count_tokens', 200],
+      ['count_tokens', 200],
+    ]);
+  });
+
+  it('an InvokeModel body that is not JSON → ValidationException', async () => {
+    const err = await client()
+      .send(new CountTokensCommand({ modelId: CLAUDE, input: { invokeModel: { body: new TextEncoder().encode('not json') } } }))
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(ValidationException);
   });
 });
 

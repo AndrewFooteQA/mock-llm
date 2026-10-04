@@ -1,5 +1,5 @@
 import { embedding } from '../core/rng.js';
-import { chunkText, textPieces } from '../core/tokens.js';
+import { approxTokens, chunkText, textPieces } from '../core/tokens.js';
 import type { ErrorSpec, IRContent, IRMessage, IRRequest, IRRequestPart, IRResponse, IRTool, StopReason } from '../core/types.js';
 import { ApiError, defaultStopReason, requireField, retryHeaders, sse, type Adapter, type RenderContext } from './adapter.js';
 
@@ -26,6 +26,7 @@ export const geminiAdapter: Adapter = {
           return 'count_tokens';
         case 'embedContent':
         case 'batchEmbedContents':
+        case 'predict': // Vertex AI, for non-Gemini embedding models (text-embedding-*, gemini-embedding-001)
           return 'embeddings';
       }
       return null;
@@ -118,6 +119,14 @@ export const geminiAdapter: Adapter = {
     if (req.endpoint === 'embeddings') {
       const texts = (c: any) => (c?.parts ?? []).map((p: any) => p.text ?? '').join(' ');
       const dims = (r: any) => r?.outputDimensionality ?? r?.output_dimensionality ?? 768;
+      if (req.path.endsWith(':predict')) {
+        // Vertex `{ instances: [{ content }], parameters: { outputDimensionality } }` → `{ predictions: [{ embeddings }] }`.
+        const inputs: string[] = (req.raw?.instances ?? []).map((i: any) => (typeof i?.content === 'string' ? i.content : texts(i?.content)));
+        const predictions = inputs.map((text) => ({
+          embeddings: { values: Array.from(embedding(text, dims(req.raw?.parameters))), statistics: { token_count: approxTokens(text), truncated: false } },
+        }));
+        return { status: 200, headers: {}, body: { predictions, metadata: { billableCharacterCount: inputs.reduce((n, t) => n + t.length, 0) } } };
+      }
       if (req.path.endsWith(':batchEmbedContents')) {
         const requests: any[] = req.raw?.requests ?? [];
         return { status: 200, headers: {}, body: { embeddings: requests.map((r) => ({ values: Array.from(embedding(texts(r.content), dims(r))) })) } };

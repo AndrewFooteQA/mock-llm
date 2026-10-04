@@ -42,6 +42,10 @@ const m: Promise<MockLLM> = createMockLLM({ strict: true });
 void m; void faults.rateLimit(); void toHaveOfferedTool; void useVitest; void useJest; void test; void expect; void mockLLMEnv(4010); void startMockLLM;
 `,
 );
-run(join(root, 'node_modules/.bin/tsc'), ['--ignoreConfig', '--noEmit', '--strict', '--skipLibCheck', '--module', 'nodenext', '--moduleResolution', 'nodenext', '--target', 'es2022', '--types', 'node', 'types.ts']);
-console.log('  ✔ types: mock-llm, mock-llm/vitest, mock-llm/jest, mock-llm/playwright');
+// MOCK_LLM_TSC: check with another TypeScript (the compat matrix's oldest/latest), e.g. /tmp/ts6/node_modules/typescript/bin/tsc.
+const tsc = process.env.MOCK_LLM_TSC ?? join(root, 'node_modules/typescript/bin/tsc');
+const tsMajor = Number(run(process.execPath, [tsc, '--version']).match(/Version (\d+)/)?.[1]);
+const ignoreConfig = tsMajor >= 6 ? ['--ignoreConfig'] : []; // TS 6+ refuses file arguments next to a tsconfig.json without it
+run(process.execPath, [tsc, ...ignoreConfig, '--noEmit', '--strict', '--skipLibCheck', '--module', 'nodenext', '--moduleResolution', 'nodenext', '--target', 'es2022', '--types', 'node', 'types.ts']);
+console.log(`  ✔ types (TypeScript ${tsMajor}): mock-llm, mock-llm/vitest, mock-llm/jest, mock-llm/playwright`);
 rmSync(dir, { recursive: true, force: true });

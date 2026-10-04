@@ -70,8 +70,17 @@ export class RemoteMockLLM {
     } catch (err) {
       throw new Error(`mock-llm: cannot reach the mock at ${this.baseUrl} (${(err as Error).message}). Is it running?`);
     }
-    const json = (await res.json()) as T & { error?: { message?: string } };
-    if (!res.ok) throw new Error(`mock-llm control ${method} ${path} failed (${res.status}): ${json?.error?.message ?? 'unknown error'}`);
+    const text = await res.text();
+    let json: (T & { error?: { message?: string } }) | undefined;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // Not the mock's control API (wrong port, a proxy, another server): say so instead of a bare SyntaxError.
+    }
+    if (!res.ok || json === undefined) {
+      const detail = json?.error?.message ?? (json === undefined ? `non-JSON reply: ${JSON.stringify(text.slice(0, 200))}` : 'unknown error');
+      throw new Error(`mock-llm control ${method} ${path} failed (${res.status}): ${detail}. Is ${this.baseUrl} a mock-llm server?`);
+    }
     return json;
   }
 }

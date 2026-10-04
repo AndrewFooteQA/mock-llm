@@ -1,9 +1,15 @@
 import { ApiError, GoogleGenAI, Type } from '@google/genai';
+import type { OAuth2Client as OAuth2ClientType } from 'google-auth-library';
+import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { edge, faults } from '../../src/index.js';
 import { useMockLLM } from '../../src/testing/vitest.js';
 
 const mock = useMockLLM({ seed: 7 });
+// The google-auth-library copy @google/genai itself depends on, as in a real app. The compat matrix runs older SDK
+// releases built against an older google-auth-library, whose auth client the SDK can't use from a newer copy.
+const require = createRequire(import.meta.url);
+const { OAuth2Client } = createRequire(require.resolve('@google/genai'))('google-auth-library') as { OAuth2Client: typeof OAuth2ClientType };
 const MODEL = 'gemini-2.5-flash';
 const ai = () => new GoogleGenAI({ apiKey: 'test', httpOptions: { baseUrl: mock.urls.gemini } });
 
@@ -128,5 +134,25 @@ describe('gemini: other endpoints', () => {
     const names: string[] = [];
     for await (const m of await ai().models.list()) names.push(m.name!);
     expect(names).toContain(`models/${MODEL}`);
+  });
+
+  it('Vertex AI: embedContent for non-Gemini models (`:predict`) and Gemini models (`:embedContent`)', async () => {
+    // Static OAuth token: the SDK sends `Authorization: Bearer …` without looking up Google credentials.
+    const authClient = new OAuth2Client();
+    authClient.setCredentials({ access_token: 'test-token', expiry_date: Date.now() + 3_600_000 });
+    const vertex = new GoogleGenAI({ vertexai: true, project: 'p', location: 'us-central1', googleAuthOptions: { authClient }, httpOptions: { baseUrl: mock.urls.gemini } });
+
+    const predicted = await vertex.models.embedContent({ model: 'text-embedding-005', contents: ['hello', 'world'], config: { outputDimensionality: 8 } });
+    expect(predicted.embeddings).toHaveLength(2);
+    expect(predicted.embeddings![0]!.values).toHaveLength(8);
+    expect(predicted.embeddings![0]!.statistics).toEqual({ tokenCount: expect.any(Number), truncated: false });
+    expect(mock.journal.last()!.path).toBe('/v1beta1/projects/p/locations/us-central1/publishers/google/models/text-embedding-005:predict');
+
+    const gemini = await vertex.models.embedContent({ model: 'gemini-embedding-2', contents: 'hello' });
+    expect(gemini.embeddings![0]!.values).toHaveLength(768);
+    expect(mock.journal.all().map((e) => [e.endpoint, e.status])).toEqual([
+      ['embeddings', 200],
+      ['embeddings', 200],
+    ]);
   });
 });

@@ -1,3 +1,5 @@
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import OpenAI from 'openai';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createMockLLM, envFor, RemoteMockLLM, remoteAssertions, UnmatchedRequestError, urlsFor, type MockLLM } from '../../src/index.js';
@@ -49,6 +51,17 @@ describe('HTTP control API + RemoteMockLLM', () => {
     expect(r.status).toBe(404);
     expect(((await r.json()) as any).error.message).toContain('unknown mock-llm control endpoint: GET /__mock/nope');
     await expect(new RemoteMockLLM('http://127.0.0.1:1').info()).rejects.toThrow(/cannot reach the mock at http:\/\/127\.0\.0\.1:1/);
+  });
+
+  it('a server that is not a mock (non-JSON reply) gets a clear error, not a bare SyntaxError', async () => {
+    const other = createServer((_req, res) => res.writeHead(502, { 'content-type': 'text/html' }).end('<html>Bad Gateway</html>'));
+    await new Promise<void>((r) => other.listen(0, '127.0.0.1', r));
+    try {
+      const url = `http://127.0.0.1:${(other.address() as AddressInfo).port}`;
+      await expect(new RemoteMockLLM(url).info()).rejects.toThrow(`mock-llm control GET /__mock/info failed (502): non-JSON reply: "<html>Bad Gateway</html>". Is ${url} a mock-llm server?`);
+    } finally {
+      other.close();
+    }
   });
 
   it('remote assertions run the same core against a snapshot', async () => {

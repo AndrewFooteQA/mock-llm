@@ -49,3 +49,20 @@ export interface MockLLMMatchers<R = unknown> {
   /** Every scenario expectation (`expectToolResult` / `expectRequest`) was met. */
   toHaveMetExpectations(filter?: EntryFilter): R;
 }
+
+/**
+ * Run the after-test checks (expectations, then strict mode) and fail with every failure, so an unmet
+ * expectation never hides the unmatched-request report. One failure is rethrown as-is (same error class).
+ */
+export async function runAfterTestChecks(checks: Array<() => unknown>): Promise<void> {
+  const errors: Error[] = [];
+  for (const check of checks) {
+    try {
+      await check();
+    } catch (err) {
+      errors.push(err as Error);
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new Error(errors.map((e) => `${e.name}: ${e.message}`).join('\n\n'));
+}

@@ -33,11 +33,13 @@ for (const name of examples) {
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
 
   let installed = false;
-  for (let attempt = 1; attempt <= 5 && !installed; attempt++) {
+  // Up to ~8 minutes: a new version can take several minutes to reach every registry mirror (0.1.1 took ~4).
+  const ATTEMPTS = 8;
+  for (let attempt = 1; attempt <= ATTEMPTS && !installed; attempt++) {
     // --prefer-online: revalidate the cached package metadata on every attempt. Otherwise npm keeps reusing a version
     // list fetched before the new version propagated, and every retry fails with ETARGET.
     installed = run('npm', ['install', '--prefer-online', '--no-audit', '--no-fund', '--loglevel=error'], dir);
-    if (!installed && attempt < 5) await sleep(attempt * 15_000);
+    if (!installed && attempt < ATTEMPTS) await sleep(Math.min(attempt * 20_000, 90_000));
   }
   results.push([name, installed && run('npm', ['test'], dir)]);
 }

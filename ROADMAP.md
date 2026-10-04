@@ -456,7 +456,7 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 "Supporting version X" therefore means "CI proves the mock works with X".
 
 ### R16. Release pipeline (first public release)
-**Status:** Ready for sign-off (2026-10-04)
+**Status:** Signed off: 2026-10-04
 **Goal:** anyone can `npm install -D mock-llm`, and every release is reproducible, verified and traceable to its source.
 **Acceptance criteria**
 - [x] Git repository initialised with a sensible `.gitignore`, pushed to a public GitHub repo; `package.json` has `repository`, `homepage`, `bugs`, `author`
@@ -517,23 +517,78 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
   installs with `--prefer-online`.
 
 ### R17. Dependency watch & compatibility matrix
-**Status:** Proposed
+**Status:** In progress (started 2026-10-04)
 **Depends on:** R16 (repo + CI)
 **Goal:** know within a week when a third party releases, what it affects, and prove which versions we support.
 **Acceptance criteria**
 - [ ] Renovate configured: grouped PRs per ecosystem (OpenAI, Anthropic, Google GenAI, all `@aws-sdk/*` together, Vitest, Jest, Playwright incl. browsers,
       TypeScript, Node versions, example projects); release notes in PRs; schedule; lockfile maintenance
+      *(`renovate.json`: one group each for OpenAI, Anthropic, Google GenAI (+ google-auth-library), AWS (`@aws-sdk/*` + `@smithy/*`), Vitest, Jest, Playwright, TypeScript,
+      Node types, Changesets, GitHub Actions and "example projects". Root and examples are in the same group, `examples/` is un-ignored, peer ranges are never auto-bumped,
+      and there are SDK labels for the diff workflow. Schedule: Mondays before 7am; lockfile maintenance on. Release notes are Renovate's default. `renovate-config-validator`:
+      "Config validated successfully". Node lines: see the weekly node-check below. **Pending: the maintainer installs the Renovate app; the first PR is the evidence.**)*
 - [ ] Compatibility matrix in CI: **oldest supported + latest** of each SDK and test framework (current + previous major), on Node 20/22/24/26;
       runs on PRs (smoke subset) and weekly (full)
+      *(`compat/targets.json` + `scripts/compat.mjs` + `.github/workflows/compat.yml`: PRs run a smoke subset (4 SDKs at their oldest, on Node 24); weekly, on demand and on Renovate PRs
+      run the full matrix, 21 jobs (9 targets × oldest/latest, plus everything-latest on Node 22/24/26). Each run works in a temp copy of the repo. Framework targets run the
+      examples outside the repo against the packed tarball. Local run, 2026-10-04: **18/18 pass** (table in README › Compatibility). `actionlint` is clean.
+      **Pending: the first CI run after push.**)*
 - [ ] Weekly **"latest"** job installs the newest release of every SDK/framework (even before Renovate's PR) and opens an issue on failure
+      *(`compat.mjs run-all-latest`: every target at latest together, plus every example with its SDKs/frameworks at latest, on each Node line. The workflow's `report`
+      job opens or updates a `compat-failure` issue on any failure, or when `node-check` finds a Node line to add or drop, and opens a "Compatibility results" PR with
+      `compat/results.json` and the README table. **Pending: first weekly / `workflow_dispatch` run.**)*
 - [ ] **SDK surface diff report:** a script that diffs the relevant parts of each SDK's type definitions between two versions (stream event types, content-block
       types, request parameters, endpoints, error classes) and posts the summary on the Renovate PR
-- [ ] **SDK update playbook** in CLAUDE.md: classify each update as no impact / breaking (fix in the same PR with tests) / new feature to support
+      *(`scripts/sdk-surface-diff.mjs`, plus `.github/workflows/sdk-diff.yml`, which comments once per Renovate PR and updates the comment in place. Real runs: openai 7.25.0 → 7.28.0
+      gave 3 changed types (`Stream` flagged); @anthropic-ai/sdk 0.66.0 → 0.131.0 gave 172 added types, including the new `ContentBlock` union members. Tests:
+      `tests/unit/sdk-surface-diff.test.ts` (8), which found and fixed two parser bugs. **Pending: posted on a real Renovate PR.**)*
+- [x] **SDK update playbook** in CLAUDE.md: classify each update as no impact / breaking (fix in the same PR with tests) / new feature to support
       (becomes a roadmap item with acceptance criteria) / deprecation; record the decision in the PR
-- [ ] README **Compatibility** table generated from matrix results (not hand-written); optional peer ranges match the tested range
+      *(CLAUDE.md › "SDK updates (dependency PRs)": read → classify (4 classes, incl. `sdkAtLeast()` gating, SDK-side only) → floors → record; linked from README,
+      CONTRIBUTING and RELEASING › Compatibility policy)*
+- [x] README **Compatibility** table generated from matrix results (not hand-written); optional peer ranges match the tested range
+      *(`compat.mjs readme` writes between markers from `compat/results.json`. `compat lint` in `npm run check` fails when they're stale: it caught one real case,
+      after the Vitest floor moved. Peers: `vitest >=4.0.1`, `@jest/globals >=29`, `@playwright/test >=1.56`, `yaml >=2`, enforced by
+      `tests/unit/compat.test.ts › optional peer ranges match the tested floors`. Changeset `compat-matrix.md` (minor, with a migration note).)*
 - [ ] Proven once end to end: a real SDK update PR goes through the playbook (or a deliberately downgraded-then-upgraded SDK as a drill)
 - [ ] Standard criteria: docs · `npm run check`
-**Amendments:** none
+      *(README Install → Compatibility section, plus a chunk-interval tip; RELEASING › Compatibility policy and Renovate setup; CONTRIBUTING; the CLAUDE.md playbook and layout;
+      a Reference page note. `npm run check` is green locally: 255 tests, 305 lesson runs, 8/8 examples, compat lint. **Pending: CI green after the push.**)*
+**Amendments:**
+- *Node 22/24/26* rather than 20/22/24/26 (Node 20 support was dropped in R16).
+- *What "oldest supported" means.* For a package with real majors (openai, @google/genai, Vitest, Jest, TypeScript), it is the first
+  release of the previous major (`6.0.0`, `1.0.0`, `4.0.0`, `29.0.0`, `6.0.2`). For packages that are 0.x or have had a single
+  major for years (@anthropic-ai/sdk, @aws-sdk/*, Playwright, yaml), it is the first release at least 12 months old when the floor is
+  set: `0.66.0`, `3.906.0`, `1.56.0`. yaml uses `2.0.0`, the previous major's floor being 1.x, which predates scenario files. The floors live in
+  `compat/targets.json`, are reviewed quarterly, and raising one is a `minor` bump.
+- *SDKs are not peer dependencies.* The app under test owns them, so "supported SDK versions" is a compatibility claim proven by the
+  matrix. Our test-framework integrations (`vitest`, `@jest/globals`, `@playwright/test`) and `yaml` are peers, and their ranges change to
+  match the tested floors (e.g. `vitest >=1` becomes `>=4`). That narrowing is a `minor` release.
+- *TypeScript is in the matrix* as a consumer check: our published `.d.ts` files must type-check in user projects on the oldest
+  supported TypeScript (6.0.2) as well as the latest.
+- *Matrix size:* weekly full = each package {oldest, latest} on Node 24, plus an "everything latest" run on Node 22/24/26. PRs run a
+  smoke subset: the oldest of the four provider SDKs on Node 24.
+- *The surface diff parses `.d.ts` files itself* rather than using the compiler API (TypeScript 7 only has an unstable JS API).
+- *Renovate needs the Renovate GitHub App installed on the repo:* a maintainer action.
+- *First matrix findings (2026-10-04, before any fixes):* `@anthropic-ai/sdk@0.66.0` and `@aws-sdk/client-bedrock-runtime@3.906.0` pass all 216
+  library tests. `openai@6.0.0` fails 3 (Responses streaming/refusal and a strict-mode chaos test) and `@google/genai@1.0.0` fails 4 (error
+  envelopes, mid-stream error, env config). Each failure is triaged as a mock incompatibility (fix it) or a test using newer SDK API
+  (version-gate the test, and document the floor).
+- *Triage results (2026-10-04).* None of these were mock wire bugs. The matrix found:
+  - **openai 6.0.0:** two SDK-behaviour changes. `finalResponse().output_text` arrived in **6.45.0**, and in-stream errors are wrapped as `APIError` from
+    **7.5.0** (earlier SDKs reject with the raw `error` event). Both are bisected and gated with `sdkAtLeast()` (`tests/helpers/sdk-version.ts`); the
+    wire-side assertions are unchanged.
+  - **@google/genai:** `ApiError` arrived in **1.6.0** and `GEMINI_API_KEY` in 1.4.0, so the floor is 1.6.0. The Vertex test now loads `google-auth-library` the
+    way genai resolves it (a v10 auth client can't be used by an SDK built on v9).
+  - **Vitest 4.0.0:** broken in any fresh install (it resolves a Vite 7 release it can't run: "Unknown method: getBuiltins"), so the floor is **4.0.1**.
+  - **Jest 29:** its default `testMatch` excludes `.mjs`, so the Jest example (and the README snippet) now set `testMatch`.
+  - **Playwright 1.56:** the example's mid-stream test used a 600 ms window, which 1.56's retry back-off can poll straight over. The window is now 1200 ms,
+    with a README tip. Chunk timing at the mock was verified (601/1204/1805 ms).
+  - **TypeScript 6** also needs `--ignoreConfig` in `smoke-pack`.
+  - **Runner fixes:** examples run outside the repo, because Vitest 4 picks up a parent `vitest.config.ts`. Playwright 1.56's browser download hung once locally on Node 26
+    (it worked on Node 22, cause not investigated). CI runs these targets on Node 24.
+- *Concurrency:* a separate review session edited the working tree during R17 (its changes are tracked as its own changeset and R19). R17 was paused until
+  it finished.
 
 ### R18. Live drift detection (real provider APIs)
 **Status:** Proposed
@@ -545,6 +600,221 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
       not values, with the mock's output for the same requests
 - [ ] Differences open an issue with the diff; credentials are never logged or stored in fixtures
 - [ ] Standard criteria
+**Amendments:** none
+
+### R19. Example coverage: examples as consumer tests, plus a coverage report
+**Status:** Proposed
+**Depends on:** none (waits for the item in progress, per the one-at-a-time rule)
+**Goal:** the examples are the only tests that install the *packed* package into separate projects and use it like a
+user. Make them cover what only they can catch (packaging and types, test-framework integration, real app patterns
+for every provider), and make gaps visible with a script so coverage can't slip silently.
+
+**Why (findings, 2026-10-04 review):**
+- `claude-code-cli` exits 0 when the `claude` CLI isn't on PATH, so `test:examples` shows ✔. CI never installs the CLI,
+  so the README's Claude Code support has never been tested in CI.
+- None of the TypeScript examples is type-checked (Vitest strips types; there's no `tsconfig.json`). The published
+  `.d.ts` files go unchecked in a real project: matcher augmentations, option types, `ReplyOptions`. `smoke-pack` only
+  checks that the imports resolve.
+- The `scenarioFiles` + `reset()` bug (fixed 2026-10-04) shipped in 0.1.0 and 0.1.1. No example uses `scenarioFiles`
+  across more than one test, so nothing could catch it. A consumer project written that day failed 6/6 against the
+  published 0.1.1.
+- Feature use by examples, from grepping their tests and app code:
+
+  | Area | Covered by an example | Not covered by any example |
+  |---|---|---|
+  | Streaming via the SDK | Bedrock ConverseStream, OpenAI Chat (playwright server) | Anthropic `messages.stream()`, Gemini `generateContentStream`, OpenAI Responses `stream()` |
+  | Non-chat endpoints | none | embeddings (all providers), `countTokens` / CountTokens, `models.list` |
+  | Bedrock operations | ConverseStream | Converse, InvokeModel (Claude body), InvokeModelWithResponseStream, CountTokens |
+  | Gemini | AI Studio | Vertex AI (`vertexai: true`, `:predict` embeddings) |
+  | Faults | `rateLimit`, `overloaded`, `timeout`, `streamCut`, `streamError` | `connectionReset`, `server`, `auth` (+ `apiKeys` option), `contextLength` fault, `raw` |
+  | Responders | `reply`, `replyToolCall(s)`, `replyTemplate`, `replyLorem`, `replyFromSchema` | `replyToolCallFromSchema`, `replyEcho`, `{ thinking }` |
+  | Lifecycle | `useMockLLM` per test; `scenarioFiles` in one `node:test` suite with no reset | `useMockLLM({ scenarioFiles })` across tests; strict + expectation steps together in Vitest |
+  | Assertions | trajectory, requested/returned tool, received request/prompt(/times), tokens, unmatched | `toCostLessThan`, `journal.cost()`, `pricing`, `toHaveOfferedTool` |
+  | Other | `chunk` events, `[[mock:…]]` | `x-mock-scenario` header, the journal `wire` record, `request` / `fault` / `unmatched` events |
+
+**Acceptance criteria**
+
+*Honest results*
+- [ ] `claude-code-cli` runs in CI: the `check` job installs the Claude Code CLI, and the example asserts on the requests
+      the mock saw (evidence: CI run link with the example's request list in the log)
+- [ ] `scripts/test-examples.mjs` reports three outcomes, ✔ passed / ✘ failed / ⊘ skipped (with the reason). An example
+      skips by exiting with a documented code (e.g. 77) instead of 0. `test:examples` fails on a skip when `CI=true`
+      (evidence: output with the CLI absent locally showing ⊘; negative check: the same run with `CI=true` exits 1)
+
+*Types checked like a user's project*
+- [ ] Each TypeScript example has a `tsconfig.json` (`strict`, `noEmit`, `moduleResolution: bundler` or `nodenext`) and
+      its `test` script runs `tsc --noEmit` before the tests (evidence: `npm test` output in each)
+- [ ] The type check covers the matcher augmentations (`expect(mock).toHaveToolTrajectory(...)`), `MockLLMOptions`,
+      `ReplyOptions`, scenario-file types (`ScenarioFile`) and `JournalEntry` fields the tests read (evidence: a
+      deliberately wrong matcher argument fails `tsc` in one example; record the error, then revert)
+
+*Streaming through every chat SDK*
+- [ ] `claude-tool-agent`: the app streams its final answer with `messages.stream()`; the test checks the accumulated
+      text and `finalMessage()`, including a tool-use turn delivered by streaming
+- [ ] `gemini-structured-extraction`: a streamed extraction with `generateContentStream`, plus one mid-stream error
+      (`faults.streamError`) that the app reports
+- [ ] `jest-travel-assistant`: a streamed Responses turn (`responses.stream()`), checked against `finalResponse()`
+
+*Non-chat endpoints: new example `rag-knowledge-base`*
+- [ ] A new standalone example: a small retrieval-augmented app that embeds documents, ranks them by cosine similarity
+      and answers with the top passages in the prompt. Its app code (`src/`) contains nothing mock-specific
+- [ ] It covers embeddings through OpenAI (default base64 encoding *and* `encoding_format: 'float'`), Gemini AI Studio
+      (`embedContent`, batch) and Gemini Vertex AI (`:predict`, with a static OAuth token as in
+      `tests/contract/gemini.test.ts`), and Bedrock (Titan or Cohere embeddings via InvokeModel)
+- [ ] It covers token counting before sending (`countTokens` on Anthropic, Gemini and Bedrock CountTokens), with the app
+      trimming context to a budget, plus `models.list` used to pick a model
+- [ ] It asserts the top passages reached the prompt (`toHaveReceivedPrompt`) and the cost stayed under a budget
+      (`toCostLessThan`, `journal.cost()` with a custom `pricing` entry)
+- [ ] Listed in all three example indexes: `examples/README.md`, the README "Example projects" table and the Reference
+      page's example table in `playground/public/app.js`
+
+*Lifecycle and scripting*
+- [ ] `openai-support-bot` (or `claude-tool-agent`): a shared YAML baseline via `useMockLLM({ scenarioFiles, strict: true })`
+      used by **at least three tests**; each later test relies on the baseline (including a sequence or `once` rule
+      starting over) and adds its own `when()` override (evidence: removing the reapply from `reset()` makes these
+      tests fail; record it, then restore)
+- [ ] A Vitest test with an expectation step **and** strict mode, with the app's error swallowed, that fails for the
+      expected reason, checked with a posttest script like playwright-chat-ui's `check-expected-failures.mjs`
+- [ ] `x-mock-scenario` header used by one app that forwards it (e.g. `node-service-e2e` passes a request header through)
+
+*Faults and awkward outputs*
+- [ ] `connectionReset` and `server` (500): the app retries or degrades; the test asserts the SDK's retry count from the journal
+- [ ] `auth`: a mock started with `apiKeys` and an app configured with the wrong key shows a "check your API key" error
+      (the SDK's 401 class)
+- [ ] `faults.contextLength` scripted directly (separate from the `contextWindow` option already covered)
+- [ ] `{ thinking }` in `claude-tool-agent`: the app hides reasoning from the user but logs it; the test checks both
+
+*Provider surface*
+- [ ] `bedrock-streaming-summarizer` adds non-streaming Converse and InvokeModel with a Claude body (summary length
+      limits via `max_tokens` → `stopReason: 'max_tokens'`)
+- [ ] `gemini-structured-extraction` runs one extraction through a Vertex AI client as well as AI Studio
+
+*Coverage report script*
+- [ ] `scripts/example-coverage.mjs` (`npm run coverage:examples`) builds a **feature inventory** from the source, not
+      from a hand-kept list:
+      - exported values from `src/index.ts`
+      - keys of `faults`, `edge` and `builtinScenarios`
+      - the names of `assertions` (every matcher)
+      - `RuleBuilder` methods
+      - `MockLLMOptions` and `Matcher` keys (read from the TypeScript source)
+      - scenario-file step actions and modifiers (`scenario-file.ts`)
+      - event names (`MockLLMEvents`)
+- [ ] Plus a small **SDK-surface map** in `examples/coverage.json` for things the inventory can't see:
+      - feature → patterns, per provider and SDK call (e.g. `anthropic.stream` → `/messages\.stream\(/`;
+        `bedrock.invokeModel` → `/InvokeModelCommand/`; `gemini.vertex` → `/vertexai:\s*true/`)
+      - endpoints (embeddings, countTokens, models) per provider
+- [ ] It scans each example's tests, app code, scenario files and config. Generated, lock and `node_modules` files are
+      skipped. It reports each feature as **covered** (with the examples and files that use it), **exempt** (listed in
+      `examples/coverage.json` with a one-line reason, e.g. `effectiveSeed`: internal helper) or **uncovered**
+- [ ] Output: a readable table grouped by area (default), `--json` for tooling, and a per-example feature list to check
+      the three example indexes against (rows written from use, per `CLAUDE.md`)
+- [ ] Gate: `examples/coverage.json` has a `required` list (initially: every fault, every provider's chat
+      non-streaming + streaming, embeddings per provider, the three test-framework adapters, strict mode, scenario
+      files, expectation steps). Exit 1 if a required feature is uncovered or an inventory item is neither covered nor
+      exempt, so a **new export, fault, matcher or option** fails the check until an example uses it or it's exempted
+      with a reason. Runs in `npm run check` (after `test:examples`) and in CI
+- [ ] Unit tests for the script in `tests/unit/` (inventory extraction from fixtures, pattern matching, exempt and
+      required handling, exit codes). Negative checks recorded: deleting a fault's only example use fails with that
+      fault named; adding an unused export fails until exempted
+- [ ] `CLAUDE.md` definition of done (Examples section) and `CONTRIBUTING.md` mention the script and how to exempt a
+      feature
+
+*Wrap-up*
+- [ ] After the work above, `npm run coverage:examples` reports no uncovered items; exemptions are reviewed by the
+      maintainer (evidence: the final table in the sign-off summary)
+- [ ] Standard criteria: tests · docs (README "Example projects", `examples/README.md`, Reference page example table,
+      `CLAUDE.md`, `CONTRIBUTING.md`) · examples · `npm run check`
+
+**Out of this item (on purpose):**
+- Oldest supported SDK versions: that's R17's compatibility matrix.
+- Parallel Playwright workers: R15.
+- Testing against real provider APIs: R18.
+
+**Amendments:** none
+
+### R20. Hosted playground on GitHub Pages
+**Status:** Proposed
+**Depends on:** none (waits for the item in progress)
+**Goal:** anyone can browse the tutorial, see real runs and read the Reference at
+https://andrewfooteqa.github.io/mock-llm/, linked from the README and npm, with nothing to host or operate.
+
+**Decisions (maintainer, 2026-10-04):** GitHub Pages (static); lessons replay **recorded real runs**; the free-form
+Playground gets a **"Run it live"** button that boots the real playground in the visitor's browser via **StackBlitz**;
+the site is rebuilt and deployed **on each npm release**, from the release tag, so it documents the version users install.
+
+**Acceptance criteria**
+
+*One frontend, two modes*
+- [ ] All asset, fetch and docs URLs are relative (`styles.css`, `app.js`, `api/meta`, `api/run`, `docs/…`), so the
+      same `playground/public` works at `/` locally and under `/mock-llm/` on Pages (evidence: local `npm run playground`
+      unchanged; the subpath smoke test below)
+- [ ] The frontend talks to a small transport layer: **live** (today's `/api/run` SSE and `/api/meta`) or **static**
+      (recordings and `meta.json`). The static build selects it with a marker in `index.html`; no other code path differs
+
+*Recordings*
+- [ ] `npm run playground:record` (reuses `check.mjs`'s enumeration and payload merge, `check.mjs:20-27`) writes one
+      JSON file per lesson × variant × provider: the SSE events in order, each with its offset in ms, plus the
+      request payload and the mock-llm version. It is generated at build time and not committed (no repo churn)
+- [ ] Replay feeds the same `onEvent` path as a live run, keeping the original timing (capped, e.g. ≤ 3 s per run), so
+      streaming, the Events tab, Wire, Journal & cost and the App code tab all look like a live run. A small badge
+      says "Recorded run · mock-llm vX.Y.Z"
+- [ ] `expectError` variants replay the SDK error exactly as recorded; lessons with `allowUnmatched` keep their events
+- [ ] `check.mjs` fails if any lesson × variant × provider has no recording after `playground:record` (no silent gaps)
+
+*Static build*
+- [ ] `npm run playground:build` writes `site/` (gitignored):
+      - `playground/public/*`
+      - `meta.json`, generated from the same library exports `/api/meta` uses (`server.mjs:18`)
+      - the README, ROADMAP, CHANGELOG, RELEASING and CONTRIBUTING files under `docs/`
+      - all recordings
+      - `.nojekyll`
+- [ ] Reference page fault, edge-case and scenario lists render from `meta.json`; `/docs/*.md` links resolve
+- [ ] Inputs that can't be precomputed are clearly handled. The free-form Playground page and the `files` lesson's
+      editor show the default recording read-only, plus the "Run it live" button and `npm run playground` instructions.
+      Provider and variant switching still works from recordings
+
+*Run it live (StackBlitz)*
+- [ ] Spike first, findings recorded as an amendment:
+      - Boot the repo's playground in StackBlitz WebContainers (`.stackblitzrc` / `startScript`, pinned to the release
+        tag).
+      - Report boot time, install size, and which providers work.
+      - **Risk:** Bedrock's SDK needs HTTP/2 (h2c on the mock's single port), which WebContainers may not support.
+- [ ] "Run it live" opens StackBlitz at the release tag, starting `npm run playground`. Any provider that doesn't work
+      in WebContainers shows a clear in-app message there, not a hang. If the whole approach fails the spike, the
+      button falls back to "run locally" instructions and this is recorded as an amendment
+- [ ] Installing in StackBlitz doesn't download Playwright browsers or run other heavy postinstall steps (evidence: boot log)
+
+*Deploy*
+- [ ] `release.yml`: when `steps.changesets.outputs.published == 'true'`, a `pages` job checks out the new tag,
+      builds `site/`, and deploys with `actions/upload-pages-artifact` + `actions/deploy-pages` (permissions
+      `pages: write`, `id-token: write`). A `workflow_dispatch` trigger allows a manual redeploy of the latest tag
+- [ ] A failed Pages deploy is reported but never marks the npm release as failed
+- [ ] Maintainer actions listed: enable Pages with source "GitHub Actions"; set the repo "About" website to the Pages URL
+
+*Verification*
+- [ ] Playwright (Chromium, already in CI) smoke test serves `site/` under `/mock-llm/` and checks:
+      - every lesson opens and a recording plays to `done`
+      - provider switching works
+      - the Reference page lists the faults from `meta.json`
+      - **no request goes to `api/*`**, and the console shows no errors
+
+      It runs in `npm run check` (after `playground:check`). Negative check: break one root-absolute path, and the test fails
+- [ ] First deploy verified: the Pages URL loads, and its lessons, Reference and "Run it live" all work (evidence: URL +
+      deploy run link)
+
+*Discoverability*
+- [ ] README: a "Docs & live playground" link to the Pages site near the top, plus a screenshot or GIF of a lesson run
+      (served from Pages via an absolute URL, so it renders on npmjs.com too). `package.json` `homepage` is the Pages
+      URL, so npm's sidebar links to it
+- [ ] README links render correctly on the npm package page (relative repo links become absolute where npm wouldn't
+      resolve them) (evidence: checked on npmjs.com after the release)
+- [ ] Standard criteria: tests · README + Reference page ("where to find this online") · `CLAUDE.md` Layout and
+      definition of done (recordings and the static smoke test are part of `npm run check`) · `RELEASING.md` (Pages
+      deploy step) · `npm run check`
+
+**Out of this item (on purpose):** running mock-llm itself in the browser (it needs Node's `http`/`http2`); a custom
+domain; versioned docs per release (only the latest release is published).
+
 **Amendments:** none
 
 ---

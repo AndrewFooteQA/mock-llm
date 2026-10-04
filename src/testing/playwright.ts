@@ -3,6 +3,7 @@ import type { AssertionResult } from '../assert/index.js';
 import { assertions } from '../assert/index.js';
 import { createMockLLM, envFor, type MockLLMOptions } from '../mock.js';
 import { RemoteMockLLM, remoteAssertions } from '../remote.js';
+import { runAfterTestChecks } from './matchers.js';
 
 /**
  * Playwright integration. The mock runs once for the whole run (started in globalSetup),
@@ -133,8 +134,8 @@ export const test = base.extend<MockLLMFixtures & { _realProviderGuard: void }>(
     const llm = new PlaywrightMockLLM(url);
     await llm.reset();
     await use(llm);
-    await llm.assertExpectations(); // scenario expectations always fail the test when unmet
-    if (llmStrict) await llm.assertNoUnmatched();
+    // Scenario expectations always fail the test when unmet; strict mode adds unmatched requests (both reported).
+    await runAfterTestChecks([() => llm.assertExpectations(), ...(llmStrict ? [() => llm.assertNoUnmatched()] : [])]);
   },
 
   // Always on (unless blockRealProviders: false): real provider calls from the browser fail the test.

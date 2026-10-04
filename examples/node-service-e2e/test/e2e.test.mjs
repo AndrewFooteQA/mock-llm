@@ -6,6 +6,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import { createMockLLM, toHaveReceivedRequest } from 'mock-llm';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -64,7 +65,7 @@ for (const provider of ['openai', 'anthropic']) {
       const r = await chat(svc, 'Hello [[mock:rate-limit]]');
       assert.equal(r.status, 503);
       assert.deepEqual(await r.json(), { error: 'assistant_unavailable' });
-      assert.match(svc.stderr(), /upstream error: 429/);
+      assert.match(stripVTControlCharacters(svc.stderr()), /upstream error: 429/); // console.error colours numbers under FORCE_COLOR
     });
 
     it('falls back to the default reply', async () => {

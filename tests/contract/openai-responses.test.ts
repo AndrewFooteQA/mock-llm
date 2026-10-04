@@ -2,10 +2,14 @@ import OpenAI from 'openai';
 import { describe, expect, it } from 'vitest';
 import { edge, faults } from '../../src/index.js';
 import { useMockLLM } from '../../src/testing/vitest.js';
+import { sdkAtLeast } from '../helpers/sdk-version.js';
 
 const mock = useMockLLM({ seed: 7 });
 const client = () => new OpenAI({ baseURL: mock.urls.openai, apiKey: 'test', maxRetries: 0 });
 const MODEL = 'gpt-4.1';
+/** How the SDK fails a stream on an in-stream `error` event: an APIError from openai 7.5.0, the raw event before. */
+const expectStreamFailure = (err: any) =>
+  sdkAtLeast('openai', '7.5.0') ? expect(err).toBeInstanceOf(OpenAI.APIError) : expect(err).toMatchObject({ type: 'error', code: expect.any(String) });
 const weather: OpenAI.Responses.FunctionTool = {
   type: 'function',
   name: 'get_weather',
@@ -54,8 +58,9 @@ describe('openai: Responses API', () => {
     stream.on('response.output_text.delta', (e) => deltas.push(e.delta));
     const final = await stream.finalResponse();
     expect(deltas.join('')).toBe('streaming works');
-    expect(final.output_text).toBe('streaming works');
     expect(final.output[0]!.type).toBe('reasoning');
+    expect((final.output[1] as any).content[0].text).toBe('streaming works');
+    if (sdkAtLeast('openai', '6.45.0')) expect(final.output_text).toBe('streaming works'); // finalResponse() computes output_text from 6.45.0
   });
 
   it('streams function call arguments', async () => {
@@ -92,6 +97,14 @@ describe('openai: Responses API', () => {
     const long = await client().responses.create({ model: MODEL, input: 'long' });
     expect(long.status).toBe('incomplete');
     expect(long.incomplete_details).toEqual({ reason: 'max_output_tokens' });
-    await expect(client().responses.stream({ model: MODEL, input: 'err' }).finalResponse()).rejects.toBeInstanceOf(OpenAI.APIError);
+    expectStreamFailure(await client().responses.stream({ model: MODEL, input: 'err' }).finalResponse().catch((e) => e));
+  });
+
+  it('the in-stream error event continues the sequence_number count', async () => {
+    mock.when({}).fail(faults.streamError({ afterChunks: 5 }));
+    expectStreamFailure(await client().responses.stream({ model: MODEL, input: 'x' }).finalResponse().catch((e) => e));
+    const events = mock.journal.last()!.wire!.response.body.split('\n').filter((l) => l.startsWith('data: ')).map((l) => JSON.parse(l.slice(6)));
+    expect(events.map((e) => e.sequence_number)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(events.at(-1).type).toBe('error');
   });
 });

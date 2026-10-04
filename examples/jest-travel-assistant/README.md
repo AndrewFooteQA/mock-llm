@@ -21,8 +21,10 @@ mock-llm is published as an ES module, so Jest must run in ESM mode. This exampl
 // package.json
 "type": "module",
 "scripts": { "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js" },
-"jest": { "testEnvironment": "node", "transform": {} }
+"jest": { "testEnvironment": "node", "transform": {}, "testMatch": ["**/test/**/*.test.mjs"] }
 ```
+
+`testMatch` is only needed for `.mjs` test files on Jest 29: Jest 30's default pattern includes `.mjs`, Jest 29's doesn't.
 
 Import Jest's APIs from `@jest/globals`. For TypeScript tests, keep your existing transform (ts-jest, babel or swc)
 configured for ESM; mock-llm ships its own types for the matchers.

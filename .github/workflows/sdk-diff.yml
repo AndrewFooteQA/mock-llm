@@ -1,0 +1,37 @@
+name: SDK surface diff
+
+# On dependency PRs (Renovate), comment what changed in the parts of each provider SDK that mock-llm impersonates
+# (stream events, content blocks, parameters, endpoints, errors): scripts/sdk-surface-diff.mjs. The comment is a
+# reading aid for the SDK update playbook in CLAUDE.md; the compatibility matrix decides whether the mock still works.
+on:
+  pull_request:
+    paths: [package-lock.json]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  diff:
+    if: startsWith(github.head_ref, 'renovate/')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Diff
+        run: |
+          git show "origin/${{ github.base_ref }}:package-lock.json" > base-lock.json
+          node scripts/sdk-surface-diff.mjs --locks base-lock.json package-lock.json > diff.md
+          cat diff.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment (one comment per PR, updated in place)
+        run: |
+          id=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" --paginate \
+            -q '.[] | select(.body | startswith("<!-- sdk-surface-diff -->")) | .id' | head -1)
+          if [ -n "$id" ]; then gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$id" -F body=@diff.md >/dev/null
+          else gh pr comment "${{ github.event.pull_request.number }}" --body-file diff.md; fi

@@ -1,7 +1,7 @@
 {
   "name": "mock-llm",
   "version": "0.1.1",
-  "description": "In-process mock of LLM provider APIs (OpenAI, Anthropic, Gemini, Bedrock) for testing apps with the official SDKs \u2014 no tokens spent.",
+  "description": "In-process mock of LLM provider APIs (OpenAI, Anthropic, Gemini, Bedrock) for testing apps with the official SDKs — no tokens spent.",
   "license": "MIT",
   "author": "AndrewFooteQA (https://github.com/AndrewFooteQA)",
   "repository": {
@@ -50,11 +50,12 @@
     "playground": "npm run build && node playground/server.mjs",
     "test:examples": "node scripts/test-examples.mjs",
     "playground:check": "npm run build && node playground/check.mjs",
-    "check": "npm run typecheck && npm test && npm run playground:check && npm run test:examples",
+    "check": "npm run typecheck && node scripts/compat.mjs lint && npm test && npm run playground:check && npm run test:examples",
     "pack:check": "npm run build && node scripts/check-pack.mjs && node scripts/smoke-pack.mjs",
     "changeset": "changeset",
     "release": "npm run pack:check && changeset publish",
-    "verify:published": "node scripts/verify-published.mjs"
+    "verify:published": "node scripts/verify-published.mjs",
+    "compat": "node scripts/compat.mjs"
   },
   "keywords": [
     "anthropic",
@@ -74,8 +75,8 @@
   },
   "peerDependencies": {
     "@jest/globals": ">=29",
-    "@playwright/test": ">=1.40",
-    "vitest": ">=1",
+    "@playwright/test": ">=1.56",
+    "vitest": ">=4.0.1",
     "yaml": ">=2"
   },
   "peerDependenciesMeta": {
@@ -100,6 +101,7 @@
     "@jest/globals": "^30.5.2",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.3",
+    "google-auth-library": "^10.9.1",
     "jest": "^30.5.2",
     "openai": "^7.25.0",
     "typescript": "^7.0.2",

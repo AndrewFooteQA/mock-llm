@@ -1,0 +1,164 @@
+{
+  "openai": {
+    "oldest": {
+      "version": "6.0.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "7.28.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "@anthropic-ai/sdk": {
+    "oldest": {
+      "version": "0.66.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "0.131.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "@google/genai": {
+    "oldest": {
+      "version": "1.6.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "2.27.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "@aws-sdk/client-bedrock-runtime": {
+    "oldest": {
+      "version": "3.906.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "3.1146.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "vitest": {
+    "oldest": {
+      "version": "4.0.1",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "5.0.3",
+      "ok": true,
+      "node": [
+        "22"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "jest": {
+    "oldest": {
+      "version": "29.0.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "30.5.2",
+      "ok": true,
+      "node": [
+        "22"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "@playwright/test": {
+    "oldest": {
+      "version": "1.56.0",
+      "ok": true,
+      "node": [
+        "22"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "1.63.0",
+      "ok": true,
+      "node": [
+        "22"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "yaml": {
+    "oldest": {
+      "version": "2.0.0",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "2.9.1",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    }
+  },
+  "typescript": {
+    "oldest": {
+      "version": "6.0.2",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    },
+    "latest": {
+      "version": "7.0.2",
+      "ok": true,
+      "node": [
+        "26"
+      ],
+      "date": "2026-10-04"
+    }
+  }
+}
