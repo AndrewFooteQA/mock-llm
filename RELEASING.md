@@ -44,6 +44,13 @@ npx changeset pre exit           # when ready for the stable release
 
 `latest` only ever points at a stable version.
 
+## Repository settings
+
+- **Settings → Actions → General → Workflow permissions:** enable **Allow GitHub Actions to create and approve pull
+  requests**. Otherwise the Version Packages PR fails with "GitHub Actions is not permitted to create or approve pull
+  requests". PRs opened with the workflow token don't trigger CI on their own, but the release workflow runs the full check
+  again before publishing.
+
 ## npm authentication
 
 The workflow uses **npm trusted publishing** (OIDC): npm trusts this repository's `release.yml`, so CI holds no
@@ -61,8 +68,12 @@ token. The workflow no longer reads any token. To bootstrap a new package, tempo
 2. In your own terminal, run `gh secret set NPM_TOKEN --repo AndrewFooteQA/mock-llm` and paste the token at the prompt.
    Never pass it as an argument: it would end up in your shell history.
 3. Push to `main`. The release workflow publishes `0.1.0` (package.json already has that version).
-4. On npmjs.com, go to **mock-llm → Settings → Trusted publishing → GitHub Actions** and enter: owner `AndrewFooteQA`,
-   repo `mock-llm`, workflow `release.yml`.
+4. On npmjs.com, go to **mock-llm → Settings → Trusted publishing → GitHub Actions** and enter: owner `AndrewFooteQA`
+   (same capitalisation), repo `mock-llm`, workflow `release.yml` (file name only), environment **empty**. Under
+   **Allowed actions**, enable **Allow npm publish**. New trusted publishers allow only `npm stage publish`, and a direct
+   publish then fails with `E403 OIDC permission denied for this action`.
+   If the publisher doesn't match, the exchange fails with `E404 … OIDC token exchange error - package not found`. When
+   publishing fails, the workflow's "show npm's OIDC / auth log lines" step prints the reason.
 5. In the same settings, set **Publishing access** to "Require two-factor authentication and disallow tokens".
 6. Revoke the token on npmjs.com and run `gh secret delete NPM_TOKEN`.
 
