@@ -93,6 +93,29 @@ describe('gemini: errors', () => {
     };
     await expect(run()).rejects.toMatchObject({ status: 503 });
   });
+
+  it('mid-stream error arrives as its own network read, even for a slow reader (regression: CI on Linux)', async () => {
+    // The SDK only recognises the bare error JSON if JSON.parse succeeds on a single read. A loaded client that reads
+    // late used to get the last SSE chunk and the error in one read, and raised "Incomplete JSON segment at the end".
+    mock.when({}).fail(faults.streamError({ afterChunks: 2, error: { kind: 'overloaded' } }));
+    const res = await fetch(`${mock.urls.gemini}/v1beta/models/${MODEL}:streamGenerateContent?alt=sse`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'x' }] }] }),
+    });
+    const reader = res.body!.getReader();
+    const reads: string[] = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      reads.push(new TextDecoder().decode(value));
+      await new Promise((r) => setTimeout(r, 20)); // a slow consumer
+    }
+    const last = reads.at(-1)!;
+    expect(() => JSON.parse(last)).not.toThrow();
+    expect(JSON.parse(last)).toMatchObject({ error: { code: 503, status: 'UNAVAILABLE' } });
+    expect(reads.slice(0, -1).join('')).toContain('data:');
+  });
 });
 
 describe('gemini: other endpoints', () => {

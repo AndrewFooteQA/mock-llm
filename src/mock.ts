@@ -99,6 +99,8 @@ type Req = IncomingMessage | Http2ServerRequest;
 type Res = ServerResponse | Http2ServerResponse;
 
 const WIRE_LIMIT = 256 * 1024;
+/** Pause before a mid-stream error frame (see the stream loop). */
+const STREAM_ERROR_GAP_MS = 50;
 /** Response → its chunk-event emitter, set per exchange in handle(). */
 const CHUNKS = new WeakMap<object, (data: string | Uint8Array) => void>();
 /** Response → its wire record, so every send path can log without extra plumbing. */
@@ -586,6 +588,11 @@ export class MockLLM {
       if (closed(res)) return;
       if (cut && i === cut.afterChunks) {
         if (cut.error) {
+          // Like the real APIs, the error comes after a pause, so the client has consumed the earlier chunks first.
+          // Without the pause, clients can see the last chunk and the error in one read: the Gemini SDK only
+          // recognises its bare-JSON error when it fills a read on its own (Node ≤ 24's fetch merges reads).
+          await sleep(STREAM_ERROR_GAP_MS, res);
+          if (closed(res)) return;
           const frame = adapter.streamError(cut.error, ctx, ir);
           await write(res, frame);
           CHUNKS.get(res)?.(frame);

@@ -776,7 +776,7 @@ const FAULT_DOCS = {
   connectionReset: 'Destroy the socket (HTTP/2: reset the stream)',
   timeout: 'Accept the request and never answer',
   streamCut: 'Stream n chunks, then drop the connection',
-  streamError: 'Stream n chunks, then send a native in-stream error event',
+  streamError: 'Stream n chunks, then (after a ~50 ms pause, as from the real API) send a native in-stream error event',
 };
 const EDGE_DOCS = {
   empty: 'Empty text content',

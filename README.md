@@ -217,7 +217,7 @@ mock.when({}).fail(faults.authError());            // also: badRequest, permissi
 mock.when({}).fail(faults.timeout());              // never answers → client timeout
 mock.when({}).fail(faults.connectionReset());
 mock.when({}).fail(faults.streamCut({ afterChunks: 5 }));    // drop mid-stream
-mock.when({}).fail(faults.streamError({ afterChunks: 5 }));  // native in-stream error event
+mock.when({}).fail(faults.streamError({ afterChunks: 5 }));  // native in-stream error event, sent ~50 ms after chunk 5
 mock.when({}).fail(faults.raw(418, { anything: 'goes' }));
 
 // random, but seeded so it reproduces:
