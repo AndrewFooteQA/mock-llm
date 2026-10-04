@@ -66,7 +66,10 @@ What mock-llm supports is defined in `compat/targets.json` and proven by the com
 ## Repository settings
 
 - **Renovate:** install the [Renovate GitHub App](https://github.com/apps/renovate) for this repository. It reads
-  `renovate.json` and opens grouped dependency PRs on Monday mornings.
+  `renovate.json` and opens grouped dependency PRs on Monday mornings. On developer.mend.io → the repo → Settings →
+  Dependencies: Silent mode **off** (Mend's default is silent, which only lists updates on its own dashboard),
+  Automated PRs **on**, Require config file **on**. Onboarding PRs aren't needed, because `renovate.json` is committed. The
+  Dependency Dashboard issue on GitHub lets you force a scheduled update early.
 - **Settings → Actions → General → Workflow permissions:** enable **Allow GitHub Actions to create and approve pull
   requests**. Otherwise the Version Packages PR fails with "GitHub Actions is not permitted to create or approve pull
   requests". PRs opened with the workflow token don't trigger CI on their own, but the release workflow runs the full check

@@ -52,6 +52,8 @@ jobs:
       - run: npm run check
       - name: Package contents + smoke test of the packed tarball
         run: npm run pack:check
-      - name: Changeset present (PRs that change the package)
+      # Only when something that ships changed (src/ or package.json release fields): tests, docs and Renovate's
+      # devDependency / lockfile updates don't need one.
+      - name: Changeset present (PRs that change what ships)
         if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-        run: npx changeset status --since=origin/main
+        run: if node scripts/needs-changeset.mjs origin/main; then npx changeset status --since=origin/main; fi

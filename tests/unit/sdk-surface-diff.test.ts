@@ -62,7 +62,7 @@ describe('parseDeclarations', () => {
     expect([...s.get('StopReason')!.members].sort()).toEqual(["'end_turn'", "'max_tokens'", "'tool_use'"]);
   });
   it('reads interface members, ignoring JSDoc', () => {
-    expect([...s.get('TextBlock')!.members]).toEqual(['text', 'citations', 'type']);
+    expect([...s.get('TextBlock')!.members]).toEqual(['text', 'citations', 'type', "type:'text'"]);
   });
   it('qualifies declarations inside namespaces', () => {
     expect([...s.get('Messages.MessageCreateParams')!.members]).toEqual(['model', 'max_tokens', 'stream']);
@@ -70,6 +70,17 @@ describe('parseDeclarations', () => {
   });
   it('reads class members, marking methods', () => {
     expect([...s.get('APIError')!.members]).toEqual(['status', 'constructor()', 'generate()']);
+  });
+});
+
+describe('member literal types (regression: openai 7.28.0 added detail: \'original\' unnoticed)', () => {
+  const before = `export interface ImageURL {\n  url: string;\n  detail?: 'auto' | 'low' | 'high';\n}`;
+  const after = `export interface ImageURL {\n  url: string;\n  detail?: 'auto' | 'low' | 'high' | 'original';\n}`;
+  it('records each string literal of a member type as member:literal', () => {
+    expect([...parseDeclarations(before).get('ImageURL')!.members]).toEqual(['url', 'detail', "detail:'auto'", "detail:'low'", "detail:'high'"]);
+  });
+  it('a literal added to a member type shows up in the diff', () => {
+    expect(diffSurfaces(parseDeclarations(before), parseDeclarations(after)).changed).toEqual([{ name: 'ImageURL', added: ["detail:'original'"], removed: [] }]);
   });
 });
 
@@ -81,7 +92,7 @@ describe('diffSurfaces + markdown', () => {
     expect(d.changed).toEqual([
       { name: 'APIError', added: ['requestID'], removed: [] },
       { name: 'ContentBlock', added: ['ThinkingBlock'], removed: [] },
-      { name: 'Messages.MessageCreateParams', added: ['thinking'], removed: [] },
+      { name: 'Messages.MessageCreateParams', added: ['thinking', "thinking:'adaptive'"], removed: [] },
       { name: 'StopReason', added: ["'refusal'"], removed: [] },
       { name: 'TextBlock', added: [], removed: ['citations'] },
     ]);
