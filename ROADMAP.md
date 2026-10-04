@@ -456,7 +456,7 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 "Supporting version X" therefore means "CI proves the mock works with X".
 
 ### R16. Release pipeline (first public release)
-**Status:** In progress (started 2026-10-04). 0.1.0 is published; waiting on the maintainer to switch npm to trusted publishing (see below)
+**Status:** Ready for sign-off (2026-10-04)
 **Goal:** anyone can `npm install -D mock-llm`, and every release is reproducible, verified and traceable to its source.
 **Acceptance criteria**
 - [x] Git repository initialised with a sensible `.gitignore`, pushed to a public GitHub repo; `package.json` has `repository`, `homepage`, `bugs`, `author`
@@ -471,22 +471,25 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
       37217569850 green on every job.)*
 - [x] Changesets: each change carries a changeset; a generated "Version Packages" PR bumps the version and writes `CHANGELOG.md`
       *(`.changeset/config.json`; `release.yml` uses `changesets/action@v1` (Version Packages PR); CI fails a PR with no changeset; CLAUDE.md DoD item 4)*
-- [ ] Publishing from CI only, via npm **trusted publishing** (OIDC, no long-lived token) with **provenance**; the publish job runs only from the release PR merge
+- [x] Publishing from CI only, via npm **trusted publishing** (OIDC, no long-lived token) with **provenance**; the publish job runs only from the release PR merge
       *(0.1.0 was published from CI (release run 37217569854) with provenance, using the bootstrap token. On 2026-10-04 the maintainer configured the trusted
       publisher (`release.yml`), revoked the token and deleted the `NPM_TOKEN` secret (`gh secret list` is empty). `release.yml` no longer references any token.
-      **Not yet proven:** a tokenless OIDC publish. That needs the next release.)*
+      **Proven by 0.1.1**: changeset → Version Packages PR #1 (opened by the workflow) → merge → release run 37219890165 published with no secret in the repo.
+      `npm view mock-llm@0.1.1 _npmUser` = "GitHub Actions <npm-oidc-no-reply@github.com>" (0.1.0, published with the token, shows the maintainer's account);
+      provenance `https://slsa.dev/provenance/v1`.)*
 - [x] Pre-publish smoke test: install the packed `.tgz` into a clean temp project; `import 'mock-llm'`, `mock-llm/vitest`, `mock-llm/jest`, `mock-llm/playwright` resolve with types
       *(`scripts/smoke-pack.mjs`: a fresh project installs the tarball offline; a real request goes through the installed package; `tsc --strict` on imports from all 4 entry points.
       Output: "✔ runtime … ✔ types: mock-llm, mock-llm/vitest, mock-llm/jest, mock-llm/playwright". Runs in `pack:check`.)*
 - [x] Post-publish verification: install the **published** version from npm into the examples and run them
       *(`scripts/verify-published.mjs` (`npm run verify:published [version]`): copies each example, pins `mock-llm` to the published version, installs from the registry with retries for
       propagation, and runs its tests. For 0.1.0 the CI step was skipped (see the amendment on `changesets/action` v2), so it was run by hand: 8/8 examples pass against
-      `mock-llm@0.1.0` from npm.)*
+      `mock-llm@0.1.0` from npm. For 0.1.1 the CI step ran but 1/8 failed (ETARGET: stale cached package metadata, see the amendments). Fixed with `--prefer-online`;
+      a rerun by hand gave 8/8 against `mock-llm@0.1.1` from npm. **The fix will first run in CI at the next release.**)*
 - [x] Documented release + semver policy (what's major/minor/patch for us; 0.x while the API settles; `next` dist-tag for pre-releases)
       *(`RELEASING.md`: flow, versioning table, Node support policy, `changeset pre enter next`, deprecate rather than unpublish, the token bootstrap and a post-release checklist)*
 - [x] First release `0.1.0` published; the npm page shows provenance
-      *(`npm view mock-llm`: version 0.1.0, dist-tag `latest`, `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1`; tag `mock-llm@0.1.0` and
-      the GitHub Release https://github.com/AndrewFooteQA/mock-llm/releases/tag/mock-llm%400.1.0 are on the published commit `df817ab`)*
+      *(`npm view mock-llm`: version 0.1.0, dist-tag `latest`, `dist.attestations.provenance.predicateType` = `https://slsa.dev/provenance/v1`; tag `v0.1.0` and
+      the GitHub Release https://github.com/AndrewFooteQA/mock-llm/releases/tag/v0.1.0 are on the published commit `df817ab`. v0.1.1's tag and release were created by the workflow.)*
 - [x] Standard criteria: docs (README install + CONTRIBUTING/RELEASING) · `npm run check`
       *(README "Install" section (Node ≥ 22, peers, 0.x policy, tested SDK versions) and Development links; `CONTRIBUTING.md`; `RELEASING.md`; `CHANGELOG.md` 0.1.0. The Reference page
       notes the requirements and links CHANGELOG/RELEASING; `playground:check` now fails on any broken `/docs/*.md` link (negative check: 404 caught). `npm run check` green.)*
@@ -504,6 +507,14 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 - *The token needed 2FA bypass:* the account has 2FA, so the bootstrap token must have "Bypass 2FA" enabled. The first attempt returned E403 and nothing was published.
 - *`changesets/action` v1 → v2:* v1 parses log lines that Changesets CLI v3 no longer prints. So it published 0.1.0 without noticing: no tag, no GitHub Release,
   and verification skipped. v2 reads the CLI's `CHANGESETS_OUTPUT` file. The 0.1.0 tag and release were created by hand, and verification was run by hand.
+  v2 names single-package tags `vX.Y.Z`, so the 0.1.0 tag/release was renamed from `mock-llm@0.1.0` to `v0.1.0` to match.
+- *0.1.1 release (tokenless proof),* requested by the maintainer. It contains no library changes. Setup issues found and documented in RELEASING.md:
+  - the repo setting "Allow GitHub Actions to create and approve pull requests" is needed for the Version Packages PR;
+  - the trusted publisher needs an exact owner/repo/workflow and an empty environment (otherwise E404 "package not found");
+  - the trusted publisher needs **Allow npm publish** under Allowed actions, because the default is stage-only (otherwise E403 "OIDC permission denied").
+  `release.yml` now prints npm's OIDC log lines when publishing fails, and the bootstrap token is gone (the workflow references none).
+- *verify-published retried with stale metadata:* npm cached the version list from before 0.1.1 propagated, so all 5 retries failed with ETARGET. It now
+  installs with `--prefer-online`.
 
 ### R17. Dependency watch & compatibility matrix
 **Status:** Proposed

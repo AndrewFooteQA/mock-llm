@@ -34,7 +34,9 @@ for (const name of examples) {
 
   let installed = false;
   for (let attempt = 1; attempt <= 5 && !installed; attempt++) {
-    installed = run('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], dir);
+    // --prefer-online: revalidate the cached package metadata on every attempt. Otherwise npm keeps reusing a version
+    // list fetched before the new version propagated, and every retry fails with ETARGET.
+    installed = run('npm', ['install', '--prefer-online', '--no-audit', '--no-fund', '--loglevel=error'], dir);
     if (!installed && attempt < 5) await sleep(attempt * 15_000);
   }
   results.push([name, installed && run('npm', ['test'], dir)]);

@@ -37,7 +37,7 @@ jobs:
       - run: npm run check
 
       # v2 reads the CHANGESETS_OUTPUT file that `changeset publish` (CLI v3) writes, to detect what was
-      # published, push the mock-llm@x.y.z tag and create the GitHub release. (v1 parsed log lines that CLI v3
+      # published, push the vX.Y.Z tag and create the GitHub release. (v1 parsed log lines that CLI v3
       # no longer prints, so it missed the 0.1.0 publish.)
       - id: changesets
         uses: changesets/action@v2

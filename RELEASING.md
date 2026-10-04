@@ -13,7 +13,7 @@ run that built it.
 4. The release workflow runs again on `main`:
    - `npm run check`, the full suite;
    - `npm run pack:check`, which checks the package contents and smoke-installs the packed tarball;
-   - `changeset publish`, which publishes to npm with provenance and pushes the `mock-llm@x.y.z` git tag;
+   - `changeset publish`, which publishes to npm with provenance and then `changesets/action` pushes the `vX.Y.Z` git tag and creates the GitHub Release;
    - `npm run verify:published`, which installs the version just published from npm into a copy of every example and
      runs its tests.
 5. If verification fails, fix forward with a patch release. If the release is actually broken, also run
@@ -83,4 +83,4 @@ All later releases authenticate via OIDC.
 
 - [ ] npm package page shows the new version with a **Provenance** badge
 - [ ] `verify:published` job is green
-- [ ] Git tag `mock-llm@x.y.z` exists; the CHANGELOG entry reads well
+- [ ] Git tag `vX.Y.Z` and its GitHub Release exist; the CHANGELOG entry reads well
