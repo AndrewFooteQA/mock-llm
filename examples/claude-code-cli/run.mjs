@@ -2,7 +2,7 @@
 //   npm start          → print Claude Code's output and the requests the mock saw
 //   npm test           → same, but assert on the result
 // Without the `claude` CLI on PATH it exits 77, the conventional "skipped" code: test runners (and this repo's
-// `npm run test:examples`) report a skip instead of a pass. Install: npm install -g @anthropic-ai/claude-code
+// `npm run test:examples`) report a skip instead of a pass. Install: npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code
 import { spawn, spawnSync } from 'node:child_process';
 import { createMockLLM, toHaveReceivedPrompt, toHaveReceivedRequest } from 'mock-llm';
 
@@ -10,7 +10,7 @@ const SKIPPED = 77;
 const check = process.argv.includes('--check');
 const version = spawnSync('claude', ['--version'], { encoding: 'utf8' });
 if (version.error) {
-  console.log('Claude Code CLI (`claude`) not found on PATH; skipping. Install: npm install -g @anthropic-ai/claude-code');
+  console.log('Claude Code CLI (`claude`) not found on PATH; skipping. Install: npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code');
   process.exit(SKIPPED);
 }
 console.log(`Claude Code ${version.stdout.trim()}`);

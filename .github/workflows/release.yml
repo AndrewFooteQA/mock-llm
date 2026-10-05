@@ -29,7 +29,8 @@ jobs:
         run: npm install -g npm@latest && npm --version
       - run: npm ci
       - name: Install the Claude Code CLI for the claude-code-cli example (a skip fails CI)
-        run: npm install -g @anthropic-ai/claude-code && claude --version
+        # npm 12 blocks install scripts unless allowed; the CLI's postinstall fetches its native binary.
+        run: npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code && claude --version
       - name: Install Playwright browser for the playwright example
         run: |
           npm run build
