@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/AndrewFooteQA/mock-llm.git"
   },
-  "homepage": "https://github.com/AndrewFooteQA/mock-llm#readme",
+  "homepage": "https://andrewfooteqa.github.io/mock-llm/",
   "bugs": {
     "url": "https://github.com/AndrewFooteQA/mock-llm/issues"
   },
@@ -49,14 +49,17 @@
     "test:watch": "vitest",
     "playground": "npm run build && node playground/server.mjs",
     "test:examples": "node scripts/test-examples.mjs",
-    "playground:check": "npm run build && node playground/check.mjs",
-    "check": "npm run typecheck && node scripts/compat.mjs lint && npm test && npm run playground:check && npm run test:examples && npm run coverage:examples",
+    "playground:check": "npm run build && node playground/check.mjs --record playground/.recordings",
+    "check": "npm run typecheck && node scripts/compat.mjs lint && npm test && npm run playground:check && npm run test:site && npm run test:examples && npm run coverage:examples",
     "pack:check": "npm run build && node scripts/check-pack.mjs && node scripts/smoke-pack.mjs",
     "changeset": "changeset",
     "release": "npm run pack:check && changeset publish",
     "verify:published": "node scripts/verify-published.mjs",
     "compat": "node scripts/compat.mjs",
-    "coverage:examples": "node scripts/example-coverage.mjs"
+    "coverage:examples": "node scripts/example-coverage.mjs",
+    "playground:record": "npm run build && node playground/check.mjs --record playground/.recordings",
+    "playground:build": "node playground/build.mjs",
+    "test:site": "node playground/build.mjs --skip-record && playwright test --config playground/playwright.config.mjs"
   },
   "keywords": [
     "anthropic",

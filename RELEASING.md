@@ -15,7 +15,11 @@ run that built it.
    - `npm run pack:check`, which checks the package contents and smoke-installs the packed tarball;
    - `changeset publish`, which publishes to npm with provenance and then `changesets/action` pushes the `vX.Y.Z` git tag and creates the GitHub Release;
    - `npm run verify:published`, which installs the version just published from npm into a copy of every example and
-     runs its tests.
+     runs its tests;
+   - then it dispatches the **Pages** workflow for the new tag. That workflow rebuilds the hosted docs site
+     (https://andrewfooteqa.github.io/mock-llm/) from the tag, smoke-tests it, and deploys it. It's a separate run, so a failed docs deploy
+     never marks the npm release as failed. Redeploy by hand from Actions → Pages → Run workflow (the input takes a
+     tag or branch; empty means the latest `v*` tag).
 5. If verification fails, fix forward with a patch release. If the release is actually broken, also run
    `npm deprecate mock-llm@x.y.z "<reason>"`. Don't unpublish.
 
@@ -64,6 +68,9 @@ What mock-llm supports is defined in `compat/targets.json` and proven by the com
   or update an issue labelled `compat-failure`.
 
 ## Repository settings
+
+- **Settings → Pages → Build and deployment → Source: GitHub Actions** (for the hosted docs site), and the repo's
+  "About" website set to https://andrewfooteqa.github.io/mock-llm/.
 
 - **Renovate:** install the [Renovate GitHub App](https://github.com/apps/renovate) for this repository. It reads
   `renovate.json` and opens grouped dependency PRs on Monday mornings. On developer.mend.io → the repo → Settings →

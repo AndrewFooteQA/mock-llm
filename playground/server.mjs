@@ -15,7 +15,8 @@ import { BedrockRuntimeClient, ConverseCommand, ConverseStreamCommand } from '@a
 import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
 import YAML from 'yaml';
-import { assertions as matchers, builtinScenarios, createMockLLM, edge, faults } from '../dist/index.js';
+import { assertions as matchers, createMockLLM } from '../dist/index.js';
+import { buildMeta, DEFAULT_MODELS, DOCS } from './meta.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC = join(here, 'public');
@@ -38,13 +39,6 @@ const REVIEW_SCHEMA = {
   additionalProperties: false,
 };
 
-const DEFAULT_MODELS = {
-  openai: 'gpt-4o',
-  'openai-responses': 'gpt-4.1',
-  anthropic: 'claude-opus-5-5',
-  gemini: 'gemini-2.5-flash',
-  bedrock: 'us.anthropic.claude-sonnet-5-5',
-};
 
 /** The demo "app's" tool implementation. Bad arguments are reported back like a careful app would. */
 function runTool(call) {
@@ -451,9 +445,9 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && url.pathname === '/api/meta') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      return res.end(JSON.stringify({ scenarios: Object.keys(builtinScenarios), faults: Object.keys(faults), edge: Object.keys(edge), models: DEFAULT_MODELS }));
+      return res.end(JSON.stringify(buildMeta()));
     }
-    if (req.method === 'GET' && /^\/docs\/(README|ROADMAP|CHANGELOG|RELEASING|CONTRIBUTING)\.md$/.test(url.pathname)) {
+    if (req.method === 'GET' && new RegExp(`^/docs/(${DOCS.join('|')})\\.md$`).test(url.pathname)) {
       // The repo's own docs, served as plain text so Reference links resolve.
       res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' });
       return res.end(await readFile(join(here, '..', url.pathname.slice('/docs/'.length))));

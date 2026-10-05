@@ -1,0 +1,60 @@
+name: Pages
+
+# The hosted docs site (ROADMAP R20): the playground's static build (site/), replaying recorded runs, deployed to
+# GitHub Pages. Dispatched by release.yml after each npm release (so the site documents the version users install),
+# or run by hand to redeploy: Actions → Pages → Run workflow (empty ref = the latest release tag).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag (or branch) to build, e.g. v0.3.0; empty = the latest v* tag'
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check out the release tag
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          tag="${REF:-$(git tag --list 'v*' --sort=-v:refname | head -1)}"
+          echo "Building $tag"
+          git checkout "$tag"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build site/ (records every tutorial run against the real SDKs)
+        run: npm run playground:build
+      - name: Smoke-test site/ under the Pages subpath
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test --config playground/playwright.config.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

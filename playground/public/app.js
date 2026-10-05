@@ -1,4 +1,6 @@
 import { LESSONS, PROVIDERS } from './lessons.js';
+import { PG_DEFAULT, playgroundPayload } from './runs.js';
+import { getMeta, isStatic, run as runTransport } from './transport.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const view = $('#view');
@@ -94,8 +96,21 @@ function prettyMaybeJson(text) {
 }
 
 // ------------------------------------------------------------------ meta (from the library itself)
-let metaPromise;
-const meta = () => (metaPromise ??= fetch('/api/meta').then((r) => r.json()));
+const meta = getMeta;
+
+/**
+ * "Run it live": open the repo in StackBlitz at the released tag, starting the real playground (Node in the browser).
+ * The static build puts the version on <html data-version>.
+ */
+const REPO = 'AndrewFooteQA/mock-llm';
+const liveUrl = () => {
+  const v = document.documentElement.dataset.version;
+  return `https://stackblitz.com/github/${REPO}/tree/${v ? `v${v}` : 'main'}?startScript=playground&file=playground%2Fpublic%2Flessons.js`;
+};
+const liveNote = (what) =>
+  isStatic
+    ? `<div class="static-note">${what} The hosted site replays recorded runs. To run your own input, <a class="btn" href="${liveUrl()}" target="_blank" rel="noopener">Run it live ↗</a> (StackBlitz, about a minute to boot) or run it locally: <code>git clone https://github.com/${REPO} &amp;&amp; cd mock-llm &amp;&amp; npm install &amp;&amp; npm run playground</code></div>`
+    : '';
 
 // ------------------------------------------------------------------ router
 const done = new Set(store.get('done', []));
@@ -216,10 +231,11 @@ function mountLessonRunner(slot, lesson) {
     const box = $('[data-slot=yaml]', panel);
     const y = yamlFor();
     if (lesson.editable) {
-      editor = h(`<textarea class="editor" spellcheck="false" aria-label="Scenario YAML"></textarea>`);
+      editor = h(`<textarea class="editor" spellcheck="false" aria-label="Scenario YAML"${isStatic ? ' readonly' : ''}></textarea>`);
       editor.value = y;
       editor.rows = Math.min(24, y.split('\n').length + 1);
       box.replaceChildren(editor);
+      if (isStatic) box.append(h(liveNote('This YAML is read-only here.')));
     } else box.replaceChildren(y.trim() ? codeBlock(y, 'yaml') : h(`<div class="tip">No rules loaded: the request header / prompt token picks a built-in scenario.</div>`));
   };
   const drawSummary = () => {
@@ -276,24 +292,10 @@ function createResults(root, { focusTab } = {}) {
     api.state = { payload, provider: payload.provider, turns: [], status: 'running', startedAt: performance.now(), finished: false };
     render();
     try {
-      const res = await fetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = '';
-      for (;;) {
-        const { done: end, value } = await reader.read();
-        if (end) break;
-        buf += dec.decode(value, { stream: true });
-        for (let i; (i = buf.indexOf('\n\n')) >= 0; ) {
-          const block = buf.slice(0, i);
-          buf = buf.slice(i + 2);
-          const ev = /^event: (.*)$/m.exec(block)?.[1];
-          const data = /^data: (.*)$/m.exec(block)?.[1];
-          if (ev) onEvent(ev, data ? JSON.parse(data) : {});
-        }
-      }
+      await runTransport(payload, onEvent);
     } catch (e) {
-      api.state.error = { name: 'PlaygroundError', message: `Could not reach the playground server: ${e.message}` };
+      api.state.error =
+        e.name === 'NoRecordingError' ? { name: 'Not recorded', message: e.message } : { name: 'PlaygroundError', message: `Could not reach the playground server: ${e.message}` };
     }
     api.state.status = api.state.error ? 'error' : 'ok';
     api.state.finished = true;
@@ -310,7 +312,8 @@ function createResults(root, { focusTab } = {}) {
 
   function onEvent(ev, d) {
     const s = api.state;
-    if (ev === 'start') Object.assign(s, { model: d.model, baseUrl: d.baseUrl });
+    if (ev === 'recorded') s.recorded = d;
+    else if (ev === 'start') Object.assign(s, { model: d.model, baseUrl: d.baseUrl });
     else if (ev === 'turn-start') turn(d.turn);
     else if (ev === 'delta') {
       const t = turn(d.turn);
@@ -336,6 +339,7 @@ function createResults(root, { focusTab } = {}) {
   function render() {
     const s = api.state;
     if (!s.status) return;
+    root.dataset.status = s.finished ? s.status : 'running'; // ok | error | running (the static-site smoke test waits on it)
     const reqs = s.journal?.length ?? 0;
     const pill =
       s.status === 'running'
@@ -360,7 +364,7 @@ function createResults(root, { focusTab } = {}) {
       ['code', 'App code'],
     ];
     root.innerHTML = `
-      <div class="statusline">${pill}${assertPill}
+      <div class="statusline">${pill}${assertPill}${s.recorded ? `<span class="pill rec" title="Recorded ${esc(s.recorded.recordedAt ?? '')}">Recorded run · mock-llm v${esc(s.recorded.version)}</span>` : ''}
         ${s.model ? `<span>${esc(s.model)}</span>` : ''}
         ${s.finished ? `<span>· ${Math.round(s.elapsed)} ms</span><span>· ${reqs} HTTP request${reqs === 1 ? '' : 's'}</span>` : ''}
       </div>
@@ -652,28 +656,12 @@ params.messages.push(msg, ...msg.tool_calls.map((c) => ({ role: 'tool', tool_cal
 }
 
 // ------------------------------------------------------------------ playground
-const PG_DEFAULT = {
-  provider: 'openai',
-  model: '',
-  prompt: "What's the weather in Paris?",
-  system: '',
-  stream: true,
-  tools: true,
-  structured: false,
-  agentLoop: true,
-  maxRetries: 0,
-  timeoutMs: '',
-  scenarioHeader: '',
-  firstTokenMs: 0,
-  tokensPerSec: 0,
-  seed: 1,
-  rules: LESSONS.find((l) => l.id === 'agent-loop').yaml,
-};
 
 async function renderPlayground() {
   document.title = 'Playground · mock-llm';
   const m = await meta();
-  const s = { ...PG_DEFAULT, ...store.get('playground', {}) };
+  // The hosted (static) site can only replay the recorded default form, so it ignores saved edits.
+  const s = isStatic ? { ...PG_DEFAULT } : { ...PG_DEFAULT, ...store.get('playground', {}) };
   const presets = LESSONS.filter((l) => !l.static).flatMap((l) => [
     { label: l.title, yaml: l.yaml, run: l.run },
     ...(l.variants ?? []).filter((v) => v.yaml).map((v) => ({ label: `${l.title}: ${v.label}`, yaml: v.yaml, run: { ...l.run, ...v.run } })),
@@ -747,14 +735,15 @@ async function renderPlayground() {
   });
   const go = (e) => {
     e?.preventDefault();
-    const v = read();
-    results.run({
-      ...v,
-      maxRetries: v.maxRetries || 0,
-      timeoutMs: v.timeoutMs || undefined,
-      latency: v.firstTokenMs || v.tokensPerSec ? { firstTokenMs: v.firstTokenMs || 0, tokensPerSec: v.tokensPerSec || 0 } : undefined,
-    });
+    results.run(playgroundPayload(read()));
   };
+  if (isStatic) {
+    // Read-only except the provider: each provider's default run is recorded.
+    for (const el of form.elements) if (el.name !== 'provider' && el.type !== 'submit') el.disabled = true;
+    $('[data-slot=preset]', page).disabled = true;
+    $('[data-slot=reset]', page).hidden = true;
+    form.insertAdjacentHTML('afterbegin', liveNote('The form shows the default run, and you can switch provider.'));
+  }
   form.addEventListener('submit', go);
   form.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) go(e);
@@ -803,13 +792,16 @@ async function renderReference() {
     <div class="toc">${['Scope', 'Install', 'Options', 'Matchers', 'Responders', 'Faults', 'Edge cases', 'Scenarios', 'Assertions', 'Journal', 'Events', 'Examples', 'Endpoints'].map((t) => `<a href="#/reference" data-jump="${t}">${t}</a>`).join('')}</div>
 
     <h2 id="Scope">Scope: what mock-llm is not</h2>
-    <p>mock-llm is a <strong>library used inside your test framework</strong>. It controls what the model does and records what your app sent. It is deliberately not a test runner, a reporter or an eval tool. The full table, with what to use instead, is in the README's <a href="/docs/README.md#scope-what-mock-llm-is-not" target="_blank" rel="noopener"><code>Scope: what mock-llm is not</code></a> section.</p>
+    <p>mock-llm is a <strong>library used inside your test framework</strong>. It controls what the model does and records what your app sent. It is deliberately not a test runner, a reporter or an eval tool. The full table, with what to use instead, is in the README's <a href="docs/README.md#scope-what-mock-llm-is-not" target="_blank" rel="noopener"><code>Scope: what mock-llm is not</code></a> section.</p>
     <div class="tags">${['Assertions on app output', 'Semantic / LLM-as-judge assertions', '"Handles gracefully" assertions', 'Running suites & CLI seeds', 'Test reports', 'Production capture & OTel exporters', 'Runtime setProvider()'].map((t) => `<code>${esc(t)}</code>`).join('')}</div>
+
+    <h2 id="Online">Where to find this online</h2>
+    <p>This site is hosted at <a href="https://andrewfooteqa.github.io/mock-llm/" target="_blank" rel="noopener">andrewfooteqa.github.io/mock-llm</a> and rebuilt for each npm release. There, lessons replay runs recorded against the real SDKs, and <b>Run it live</b> opens the real playground in StackBlitz. Locally, <code>npm run playground</code> runs everything live. Source: <a href="https://github.com/AndrewFooteQA/mock-llm" target="_blank" rel="noopener">github.com/AndrewFooteQA/mock-llm</a> · package: <a href="https://www.npmjs.com/package/mock-llm" target="_blank" rel="noopener">npmjs.com/package/mock-llm</a>.</p>
 
     <h2 id="Install">Install & set up</h2>
     <div data-slot="install"></div>
-    <p>Requirements: Node ≥ 22, ESM. There are no runtime dependencies. <code>yaml</code>, <code>vitest</code>, <code>@jest/globals</code> and <code>@playwright/test</code> are optional peers, needed only for the feature that uses each one. The package is 0.x, so a minor release may change APIs; see <a href="/docs/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a>. Releases are published from CI with npm provenance (<a href="/docs/RELEASING.md" target="_blank" rel="noopener"><code>RELEASING.md</code></a>).</p>
-    <p><strong>Supported SDK and framework versions</strong> are proven by a weekly compatibility matrix. It runs each provider SDK, test framework and TypeScript at its oldest supported and latest release. The results table is in the README's <a href="/docs/README.md#compatibility" target="_blank" rel="noopener"><code>Compatibility</code></a> section.</p>
+    <p>Requirements: Node ≥ 22, ESM. There are no runtime dependencies. <code>yaml</code>, <code>vitest</code>, <code>@jest/globals</code> and <code>@playwright/test</code> are optional peers, needed only for the feature that uses each one. The package is 0.x, so a minor release may change APIs; see <a href="docs/CHANGELOG.md" target="_blank" rel="noopener"><code>CHANGELOG.md</code></a>. Releases are published from CI with npm provenance (<a href="docs/RELEASING.md" target="_blank" rel="noopener"><code>RELEASING.md</code></a>).</p>
+    <p><strong>Supported SDK and framework versions</strong> are proven by a weekly compatibility matrix. It runs each provider SDK, test framework and TypeScript at its oldest supported and latest release. The results table is in the README's <a href="docs/README.md#compatibility" target="_blank" rel="noopener"><code>Compatibility</code></a> section.</p>
 
     <h2 id="Options">createMockLLM(options)</h2>
     <table class="grid"><tbody>

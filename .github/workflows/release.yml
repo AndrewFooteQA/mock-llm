@@ -11,6 +11,7 @@ on:
 concurrency: release
 
 permissions:
+  actions: write # dispatch the Pages workflow after a release
   contents: write # version commits + tags
   pull-requests: write # the Version Packages PR
   id-token: write # npm trusted publishing (OIDC) + provenance
@@ -59,3 +60,12 @@ jobs:
       - name: Verify the published package against every example
         if: steps.changesets.outputs.published == 'true'
         run: npm run verify:published
+
+      # A separate workflow run, so a failed docs deploy never marks the npm release as failed.
+      - name: Deploy the docs site for this release (Pages workflow)
+        if: steps.changesets.outputs.published == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGES: ${{ steps.changesets.outputs.published-packages }}
+        run: gh workflow run pages.yml --ref main -f ref="v$(node -e 'console.log(JSON.parse(process.env.PACKAGES)[0].version)')"

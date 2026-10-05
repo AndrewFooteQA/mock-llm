@@ -9,3 +9,5 @@ playwright-report
 *.tgz
 .DS_Store
 .smoke
+site
+playground/.recordings

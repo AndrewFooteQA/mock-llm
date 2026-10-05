@@ -38,6 +38,10 @@ A change is not finished until all three parts are done, **in the same change**:
      - `public/app.js`, Reference page: options, matchers, responders, `FAULT_DOCS`, `EDGE_DOCS`, endpoints, examples.
        Fault, edge-case and scenario *names* come from `/api/meta`, but their descriptions are hand-written. Add one.
      - `server.mjs`: provider drivers, if a provider or SDK call shape changes.
+     - The same frontend is published as a static site that replays recorded runs. Keep every frontend URL **relative**
+       (`api/run`, `docs/README.md`, `styles.css`, never `/…`), and send every server call through `transport.js`.
+       `npm run check` records all runs and smoke-tests the static build under the Pages subpath (`npm run test:site`).
+       A new lesson, variant or provider is recorded automatically.
    - JSDoc on exported functions and options.
 
 3. **Examples** (`examples/`)
@@ -126,7 +130,9 @@ src/testing/       mock-llm/vitest + mock-llm/jest adapters (lifecycle + matcher
                    mock-llm/playwright: shared mock via startMockLLM (globalSetup) + RemoteMockLLM (src/remote.ts) over
                    the /__mock/* control API; async matchers; proven in examples/playwright-chat-ui (Chromium)
 tests/unit|contract  library tests (vitest.config.ts restricts the root run to tests/)
-playground/        docs + live tutorial (server.mjs, public/*, check.mjs)
+playground/        docs + live tutorial (server.mjs, public/*, check.mjs). Also the hosted static site (GitHub Pages):
+                   public/runs.js (every run + its key), public/transport.js (live server or recorded replay),
+                   check.mjs --record (recordings), build.mjs (site/), site.spec.mjs (smoke test under /mock-llm/)
 examples/          standalone starter projects, each with its own package.json and tests
 scripts/           repo tooling: test-examples, example-coverage, pack checks, verify-published, compat (matrix),
                    sdk-surface-diff, needs-changeset

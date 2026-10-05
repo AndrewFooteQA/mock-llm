@@ -4,6 +4,10 @@ Test your LLM-powered app against a local mock that **speaks the real provider A
 
 > mock-llm tests how **your application handles** LLM responses: parsing, retries, tool loops, error paths, rendering. It does not measure model quality; that's what evals are for.
 
+**[Docs & live playground →](https://andrewfooteqa.github.io/mock-llm/)** Step-by-step lessons with real SDK runs, a free-form playground and the API reference.
+
+[![A tutorial lesson: a tool-calling agent loop run through the OpenAI SDK against mock-llm](https://andrewfooteqa.github.io/mock-llm/screenshot.png)](https://andrewfooteqa.github.io/mock-llm/#/lesson/agent-loop)
+
 ## Status
 
 | Provider API | Endpoints |
@@ -667,13 +671,17 @@ The full feature list per example is in [`examples/README.md`](examples/README.m
 
 ## Docs & live playground
 
+**Hosted:** [https://andrewfooteqa.github.io/mock-llm/](https://andrewfooteqa.github.io/mock-llm/), rebuilt for each npm release so it documents the version you install. It replays
+runs recorded against the real SDKs, and its "Run it live" button opens the real playground in StackBlitz. To run
+your own input locally:
+
 ```sh
 npm run playground   # → http://localhost:4317
 ```
 
 The playground has three sections:
 
-- **Tutorial:** 14 runnable lessons.
+- **Tutorial:** 17 runnable lessons.
 - **Playground:** a free-form scenario editor.
 - **Reference:** the API, partly generated from the library itself.
 

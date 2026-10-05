@@ -617,7 +617,7 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 **Amendments:** none
 
 ### R19. Example coverage: examples as consumer tests, plus a coverage report
-**Status:** Ready for sign-off (2026-10-05)
+**Status:** Signed off: 2026-10-05 (the 25 exemptions in `examples/coverage.json` accepted)
 **Depends on:** none (waits for the item in progress, per the one-at-a-time rule)
 **Goal:** the examples are the only tests that install the *packed* package into separate projects and use it like a
 user. Make them cover what only they can catch (packaging and types, test-framework integration, real app patterns
@@ -795,7 +795,7 @@ for every provider), and make gaps visible with a script so coverage can't slip 
   `--prefer-online` fix, which was deferred from R16 and is now proven in CI.
 
 ### R20. Hosted playground on GitHub Pages
-**Status:** Proposed
+**Status:** In progress (started 2026-10-05)
 **Depends on:** none (waits for the item in progress)
 **Goal:** anyone can browse the tutorial, see real runs and read the Reference at
 https://andrewfooteqa.github.io/mock-llm/, linked from the README and npm, with nothing to host or operate.
