@@ -807,77 +807,117 @@ the site is rebuilt and deployed **on each npm release**, from the release tag, 
 **Acceptance criteria**
 
 *One frontend, two modes*
-- [ ] All asset, fetch and docs URLs are relative (`styles.css`, `app.js`, `api/meta`, `api/run`, `docs/…`), so the
+- [x] All asset, fetch and docs URLs are relative (`styles.css`, `app.js`, `api/meta`, `api/run`, `docs/…`), so the
       same `playground/public` works at `/` locally and under `/mock-llm/` on Pages (evidence: local `npm run playground`
       unchanged; the subpath smoke test below)
-- [ ] The frontend talks to a small transport layer: **live** (today's `/api/run` SSE and `/api/meta`) or **static**
+      *(`index.html` uses `styles.css` / `app.js`; `transport.js` uses `api/meta`, `api/run`, `meta.json` and `recordings/…`; the Reference links use `docs/…`. `check.mjs` fails on any `href="/…"` in `app.js`. Locally, `npm run playground` and `playground:check` are unchanged (310 runs, 0 failures). The subpath smoke test passes. **Negative:** `/styles.css` → `HTTP 404: http://127.0.0.1:4318/styles.css` in the smoke test; reverted.)*
+- [x] The frontend talks to a small transport layer: **live** (today's `/api/run` SSE and `/api/meta`) or **static**
       (recordings and `meta.json`). The static build selects it with a marker in `index.html`; no other code path differs
+      *(`playground/public/transport.js`: `getMeta()` and `run(payload, onEvent)`, live (SSE) or static (replay), selected only by `<html data-mode="static">`, which `build.mjs` writes. `app.js` calls nothing else.)*
 
 *Recordings*
-- [ ] `npm run playground:record` (reuses `check.mjs`'s enumeration and payload merge, `check.mjs:20-27`) writes one
+- [x] `npm run playground:record` (reuses `check.mjs`'s enumeration and payload merge, `check.mjs:20-27`) writes one
       JSON file per lesson × variant × provider: the SSE events in order, each with its offset in ms, plus the
       request payload and the mock-llm version. It is generated at build time and not committed (no repo churn)
-- [ ] Replay feeds the same `onEvent` path as a live run, keeping the original timing (capped, e.g. ≤ 3 s per run), so
+      *(`= node playground/check.mjs --record playground/.recordings`. It uses `enumerateRuns()` (`playground/public/runs.js`), shared with the page: each lesson × variant × provider, plus the Playground default form per provider. That's 310 files of `{ where, version, recordedAt, payload, events: [[ms, event, data]] }` (2.7 MB), keyed by a SHA-256 of the canonical payload. Generated at build time, gitignored. `npm run check` records during its normal check pass (no second run).)*
+- [x] Replay feeds the same `onEvent` path as a live run, keeping the original timing (capped, e.g. ≤ 3 s per run), so
       streaming, the Events tab, Wire, Journal & cost and the App code tab all look like a live run. A small badge
       says "Recorded run · mock-llm vX.Y.Z"
-- [ ] `expectError` variants replay the SDK error exactly as recorded; lessons with `allowUnmatched` keep their events
-- [ ] `check.mjs` fails if any lesson × variant × provider has no recording after `playground:record` (no silent gaps)
+      *(`transport.replay` calls the same `onEvent` with recorded offsets, scaled to fit 3 s (`MAX_REPLAY_MS`). The badge `Recorded run · mock-llm v0.2.0` shows in the status line (smoke test and screenshot).)*
+- [x] `expectError` variants replay the SDK error exactly as recorded; lessons with `allowUnmatched` keep their events
+      *(Events are stored verbatim, including the `error` event and every `mockevent` (so `unmatched` too). The smoke test asserts each lesson ends in the expected state (`data-status` ok / error).)*
+- [x] `check.mjs` fails if any lesson × variant × provider has no recording after `playground:record` (no silent gaps)
+      *(After `--record`, every `enumerateRuns()` key must exist (`<where>: no recording`). `tests/unit/playground-runs.test.ts` checks that all 310 keys are distinct and that equal payloads get equal keys.)*
 
 *Static build*
-- [ ] `npm run playground:build` writes `site/` (gitignored):
+- [x] `npm run playground:build` writes `site/` (gitignored):
       - `playground/public/*`
       - `meta.json`, generated from the same library exports `/api/meta` uses (`server.mjs:18`)
       - the README, ROADMAP, CHANGELOG, RELEASING and CONTRIBUTING files under `docs/`
       - all recordings
       - `.nojekyll`
-- [ ] Reference page fault, edge-case and scenario lists render from `meta.json`; `/docs/*.md` links resolve
-- [ ] Inputs that can't be precomputed are clearly handled. The free-form Playground page and the `files` lesson's
+      *(`playground/build.mjs`: public files, `meta.json` from `buildMeta()` (shared with `/api/meta` via `playground/meta.mjs`), `docs/` (5 files), `recordings/`, `.nojekyll`, the screenshot, and the version and static marker on `<html>`. `site/` and `playground/.recordings` are gitignored.)*
+- [x] Reference page fault, edge-case and scenario lists render from `meta.json`; `/docs/*.md` links resolve
+      *(The smoke test checks every fault and scenario name from `meta.json` on the Reference page, and that every `docs/…` link returns 200.)*
+- [x] Inputs that can't be precomputed are clearly handled. The free-form Playground page and the `files` lesson's
       editor show the default recording read-only, plus the "Run it live" button and `npm run playground` instructions.
       Provider and variant switching still works from recordings
+      *(The Playground form is disabled except the provider (each provider's default run is recorded). The `files` lesson's YAML is `readonly`. Both show a note with **Run it locally** and the `npm run playground` command. An unrecorded payload gives a "Not recorded" error (`NoRecordingError`). Covered by the smoke test.)*
 
 *Run it live (StackBlitz)*
-- [ ] Spike first, findings recorded as an amendment:
+- [x] Spike first, findings recorded as an amendment:
       - Boot the repo's playground in StackBlitz WebContainers (`.stackblitzrc` / `startScript`, pinned to the release
         tag).
       - Report boot time, install size, and which providers work.
       - **Risk:** Bedrock's SDK needs HTTP/2 (h2c on the mock's single port), which WebContainers may not support.
-- [ ] "Run it live" opens StackBlitz at the release tag, starting `npm run playground`. Any provider that doesn't work
+      *(See the amendments: StackBlitz boots and builds in about 20 s, but mock-llm's server crashes there.)*
+- [x] "Run it live" opens StackBlitz at the release tag, starting `npm run playground`. Any provider that doesn't work
       in WebContainers shows a clear in-app message there, not a hang. If the whole approach fails the spike, the
       button falls back to "run locally" instructions and this is recorded as an amendment
-- [ ] Installing in StackBlitz doesn't download Playwright browsers or run other heavy postinstall steps (evidence: boot log)
+      *(**The spike failed**, so per this criterion the button falls back to **Run it locally**: a link to the repo at the release tag, plus the clone / install / `npm run playground` command. The smoke test asserts the link and the command.)*
+- [x] Installing in StackBlitz doesn't download Playwright browsers or run other heavy postinstall steps (evidence: boot log)
+      *(Spike boot log: `npm install` finished ("66 packages are looking for funding"), then `npm run build` and `mock-llm playground → http://localhost:4317`, about 20 s in all, with no browser download (`@playwright/test` doesn't download on install). Moot after the fallback.)*
 
 *Deploy*
 - [ ] `release.yml`: when `steps.changesets.outputs.published == 'true'`, a `pages` job checks out the new tag,
       builds `site/`, and deploys with `actions/upload-pages-artifact` + `actions/deploy-pages` (permissions
       `pages: write`, `id-token: write`). A `workflow_dispatch` trigger allows a manual redeploy of the latest tag
-- [ ] A failed Pages deploy is reported but never marks the npm release as failed
-- [ ] Maintainer actions listed: enable Pages with source "GitHub Actions"; set the repo "About" website to the Pages URL
+      *(`pages.yml` (workflow_dispatch, `ref` = a tag or branch, default the latest `v*`) builds `site/`, smoke-tests it and deploys (`upload-pages-artifact` + `deploy-pages`, `pages: write`, `id-token: write`). `release.yml` gets `actions: write` and, after a publish, runs `gh workflow run pages.yml -f ref=v<version>`. Manual deploys work: runs 37295336769 and 37295944435 from `main`. **Pending: the first release-triggered deploy (0.2.1, PR #10).**)*
+- [x] A failed Pages deploy is reported but never marks the npm release as failed
+      *(The deploy is a separate workflow run (dispatched, not a job of the release run), and the dispatch step has `continue-on-error: true`.)*
+- [x] Maintainer actions listed: enable Pages with source "GitHub Actions"; set the repo "About" website to the Pages URL
+      *(RELEASING › Repository settings. Done by the maintainer on 2026-10-05: `gh api …/pages` → `build_type: workflow`; the repo homepage is the Pages URL.)*
 
 *Verification*
-- [ ] Playwright (Chromium, already in CI) smoke test serves `site/` under `/mock-llm/` and checks:
+- [x] Playwright (Chromium, already in CI) smoke test serves `site/` under `/mock-llm/` and checks:
       - every lesson opens and a recording plays to `done`
       - provider switching works
       - the Reference page lists the faults from `meta.json`
       - **no request goes to `api/*`**, and the console shows no errors
+      *(`playground/site.spec.mjs` (20 tests) via `serve-site.mjs` under `/mock-llm/` (404 for `api/*`): every lesson plays to the end; provider and variant switching; the Playground per provider; the Reference page from `meta.json` plus docs links; read-only and "Run it locally"; console errors, page errors, 4xx/5xx responses and any `api/` request all fail a test. `npm run test:site` runs in `npm run check` after `playground:check`. Negative check: above.)*
 
       It runs in `npm run check` (after `playground:check`). Negative check: break one root-absolute path, and the test fails
-- [ ] First deploy verified: the Pages URL loads, and its lessons, Reference and "Run it live" all work (evidence: URL +
+- [x] First deploy verified: the Pages URL loads, and its lessons, Reference and "Run it live" all work (evidence: URL +
       deploy run link)
+      *(https://andrewfooteqa.github.io/mock-llm/ was deployed by Pages runs 37295336769 and 37295944435. **The smoke test against the live URL** (`SITE_URL=https://andrewfooteqa.github.io/mock-llm/`): 20 passed (lessons, Reference, Playground, "Run it locally").)*
 
 *Discoverability*
-- [ ] README: a "Docs & live playground" link to the Pages site near the top, plus a screenshot or GIF of a lesson run
+- [x] README: a "Docs & live playground" link to the Pages site near the top, plus a screenshot or GIF of a lesson run
       (served from Pages via an absolute URL, so it renders on npmjs.com too). `package.json` `homepage` is the Pages
       URL, so npm's sidebar links to it
+      *(A README link near the top, and the screenshot `https://andrewfooteqa.github.io/mock-llm/screenshot.png` (absolute; produced by the smoke test during the deploy) linking to the agent-loop lesson. `package.json` `homepage` is the Pages URL.)*
 - [ ] README links render correctly on the npm package page (relative repo links become absolute where npm wouldn't
       resolve them) (evidence: checked on npmjs.com after the release)
+      *(**Pending: the next npm release** (the npm page shows the README as published; 0.2.0's has no Pages link). npmjs.com blocks automated fetches (403), so this will be checked in a browser after 0.2.1.)*
 - [ ] Standard criteria: tests · README + Reference page ("where to find this online") · `CLAUDE.md` Layout and
       definition of done (recordings and the static smoke test are part of `npm run check`) · `RELEASING.md` (Pages
       deploy step) · `npm run check`
+      *(Tests: `site.spec.mjs` (20), `tests/unit/playground-runs.test.ts` (4), `check.mjs` recording plus gap check. Docs: README (the Docs section, lesson count 14 → 17), the Reference "Where to find this online" section, CLAUDE.md (Layout, the relative-URL rule, the static site in check), RELEASING (the Pages step plus settings). `npm run check` green locally. **Pending: CI green on the final commit.**)*
 
 **Out of this item (on purpose):** running mock-llm itself in the browser (it needs Node's `http`/`http2`); a custom
 domain; versioned docs per release (only the latest release is published).
 
-**Amendments:** none
+**Amendments:**
+- *StackBlitz spike (2026-10-05):*
+  - `stackblitz.com/github/AndrewFooteQA/mock-llm?startScript=playground` boots in about 20 s. `npm install` and `npm run
+    build` work: TypeScript 7's `tsc` ran there, despite the native-binary concern. The `/tree/<ref>` form hung at
+    "Cloning repo from GitHub" for over 70 s, twice.
+  - **But the mock can't serve a request in WebContainers.** On the first SDK call the server crashes in
+    `socketOnData` (Node v22.22.3 emulation). The run showed "Success · 0 HTTP requests" with no reply.
+  - Cause (from the stack and `src/mock.ts:285-294`): to serve HTTP/1.1 and h2c on one port, the mock sniffs the
+    first bytes on a raw `net` server and hands the socket to an `http` / `http2` server
+    (`socket.unshift` + `emit('connection')`), which WebContainers' socket emulation doesn't support.
+  - Bedrock needs HTTP/2 regardless. An HTTP/1.1-only "WebContainer mode" would be a library change, and is a
+    candidate future item; it isn't in R20.
+  - The button therefore falls back to **Run it locally**, as this item allows.
+- *Recording keys are payload hashes,* so the static site needs no lookup table and an edited scenario simply isn't
+  found (a clear "Not recorded" message).
+- *The Playground page's default form is recorded per provider* (5 more runs: 310 in total). The form is read-only on
+  the hosted site except the provider.
+- *Pages builds from a tag or branch.* Existing tags predate this code, so the first deploys were from `main`; release
+  deploys use the new tag.
+- *Found during the spike, fixed:* the frontend marked a run whose event stream ended without `done` (a server crash)
+  as "Success". It now shows "The run ended unexpectedly".
 
 ---
 

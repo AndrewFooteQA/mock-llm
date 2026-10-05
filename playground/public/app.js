@@ -294,6 +294,8 @@ function createResults(root, { focusTab } = {}) {
     render();
     try {
       await runTransport(payload, onEvent);
+      // Every complete run ends with `done`; a stream that just stops means the server went away mid-run.
+      if (!api.state.done && !api.state.error) api.state.error = { name: 'PlaygroundError', message: 'The run ended unexpectedly (the playground server stopped responding).' };
     } catch (e) {
       api.state.error =
         e.name === 'NoRecordingError' ? { name: 'Not recorded', message: e.message } : { name: 'PlaygroundError', message: `Could not reach the playground server: ${e.message}` };
@@ -313,6 +315,10 @@ function createResults(root, { focusTab } = {}) {
 
   function onEvent(ev, d) {
     const s = api.state;
+    if (ev === 'done') {
+      s.done = true;
+      return;
+    }
     if (ev === 'recorded') s.recorded = d;
     else if (ev === 'start') Object.assign(s, { model: d.model, baseUrl: d.baseUrl });
     else if (ev === 'turn-start') turn(d.turn);
