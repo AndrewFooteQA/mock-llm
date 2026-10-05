@@ -6,7 +6,7 @@
 //                                for the static GitHub Pages build, and fails if any run is left without a recording)
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,10 @@ import { enumerateRuns, runKey } from './public/runs.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const recordIndex = process.argv.indexOf('--record');
-const recordDir = recordIndex === -1 ? null : process.argv[recordIndex + 1];
+const target = recordIndex === -1 ? null : process.argv[recordIndex + 1];
+// Record into a directory of our own and swap it into place at the end, so two checks running at once (e.g. a
+// hook's and yours) can't delete each other's recordings mid-run.
+const recordDir = target && `${target}.tmp-${process.pid}`;
 const version = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8')).version;
 if (recordDir) {
   rmSync(recordDir, { recursive: true, force: true });
@@ -106,7 +109,14 @@ try {
 } finally {
   server.kill();
 }
+if (recordDir) {
+  if (failures.length) rmSync(recordDir, { recursive: true, force: true });
+  else {
+    rmSync(target, { recursive: true, force: true });
+    renameSync(recordDir, target);
+  }
+}
 
-console.log(`${runs} lesson runs, ${failures.length} failures${recordDir ? ` (${recorded.length} recordings in ${recordDir})` : ''}`);
+console.log(`${runs} lesson runs, ${failures.length} failures${target ? ` (${recorded.length} recordings${failures.length ? ' discarded' : ` in ${target}`})` : ''}`);
 for (const f of failures) console.log(`  ✘ ${f}`);
 process.exit(failures.length ? 1 : 0);

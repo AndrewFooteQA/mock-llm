@@ -11,3 +11,4 @@ playwright-report
 .smoke
 site
 playground/.recordings
+playground/.recordings.tmp-*
