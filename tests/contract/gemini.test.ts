@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { edge, faults } from '../../src/index.js';
 import { useMockLLM } from '../../src/testing/vitest.js';
+import { sdkAtLeast } from '../helpers/sdk-version.js';
 
 const mock = useMockLLM({ seed: 7 });
 // The google-auth-library copy @google/genai itself depends on, as in a real app. The compat matrix runs older SDK
@@ -121,6 +122,18 @@ describe('gemini: errors', () => {
     expect(() => JSON.parse(last)).not.toThrow();
     expect(JSON.parse(last)).toMatchObject({ error: { code: 503, status: 'UNAVAILABLE' } });
     expect(reads.slice(0, -1).join('')).toContain('data:');
+  });
+});
+
+describe('gemini: continuation tokens (@google/genai 2.26.0)', () => {
+  it('serves a request that resumes with config.continuationToken, and records the token', async () => {
+    // SDK update playbook, PR #8: the SDK can now resume generation with a continuation token. The mock must still
+    // serve such requests. (Scripting a CONTINUATION response is a separate roadmap item.)
+    mock.when({}).reply('…and that is the rest of the answer.');
+    const r = await ai().models.generateContent({ model: MODEL, contents: 'go on', config: { continuationToken: 'Y29udGludWU=' } });
+    expect(r.text).toBe('…and that is the rest of the answer.');
+    // SDKs before 2.26.0 don't know the field and don't send it (SDK-side behaviour, so gated).
+    if (sdkAtLeast('@google/genai', '2.26.0')) expect(JSON.stringify(mock.journal.last()!.request.raw)).toContain('Y29udGludWU=');
   });
 });
 
