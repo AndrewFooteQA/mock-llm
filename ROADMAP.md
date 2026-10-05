@@ -795,7 +795,7 @@ for every provider), and make gaps visible with a script so coverage can't slip 
   `--prefer-online` fix, which was deferred from R16 and is now proven in CI.
 
 ### R20. Hosted playground on GitHub Pages
-**Status:** In progress (started 2026-10-05)
+**Status:** Ready for sign-off (2026-10-05)
 **Depends on:** none (waits for the item in progress)
 **Goal:** anyone can browse the tutorial, see real runs and read the Reference at
 https://andrewfooteqa.github.io/mock-llm/, linked from the README and npm, with nothing to host or operate.
@@ -859,10 +859,10 @@ the site is rebuilt and deployed **on each npm release**, from the release tag, 
       *(Spike boot log: `npm install` finished ("66 packages are looking for funding"), then `npm run build` and `mock-llm playground → http://localhost:4317`, about 20 s in all, with no browser download (`@playwright/test` doesn't download on install). Moot after the fallback.)*
 
 *Deploy*
-- [ ] `release.yml`: when `steps.changesets.outputs.published == 'true'`, a `pages` job checks out the new tag,
+- [x] `release.yml`: when `steps.changesets.outputs.published == 'true'`, a `pages` job checks out the new tag,
       builds `site/`, and deploys with `actions/upload-pages-artifact` + `actions/deploy-pages` (permissions
       `pages: write`, `id-token: write`). A `workflow_dispatch` trigger allows a manual redeploy of the latest tag
-      *(`pages.yml` (workflow_dispatch, `ref` = a tag or branch, default the latest `v*`) builds `site/`, smoke-tests it and deploys (`upload-pages-artifact` + `deploy-pages`, `pages: write`, `id-token: write`). `release.yml` gets `actions: write` and, after a publish, runs `gh workflow run pages.yml -f ref=v<version>`. Manual deploys work: runs 37295336769 and 37295944435 from `main`. **Pending: the first release-triggered deploy (0.2.1, PR #10).**)*
+      *(`pages.yml` (workflow_dispatch, `ref` = a tag or branch, default the latest `v*`) builds `site/`, smoke-tests it and deploys (`upload-pages-artifact` + `deploy-pages`, `pages: write`, `id-token: write`). `release.yml` gets `actions: write` and, after a publish, runs `gh workflow run pages.yml -f ref=v<version>`. Manual deploys work: runs 37295336769 and 37295944435 from `main`. **Release-triggered deploy proven by 0.2.1:** release run 37297442774 published 0.2.1, ran `verify:published`, and dispatched Pages run 37298135253 (`workflow_dispatch`, log `Building v0.2.1`, `HEAD is now at 360a9f7`). The live site serves `<html … data-version="0.2.1">`.)*
 - [x] A failed Pages deploy is reported but never marks the npm release as failed
       *(The deploy is a separate workflow run (dispatched, not a job of the release run), and the dispatch step has `continue-on-error: true`.)*
 - [x] Maintainer actions listed: enable Pages with source "GitHub Actions"; set the repo "About" website to the Pages URL
@@ -886,13 +886,13 @@ the site is rebuilt and deployed **on each npm release**, from the release tag, 
       (served from Pages via an absolute URL, so it renders on npmjs.com too). `package.json` `homepage` is the Pages
       URL, so npm's sidebar links to it
       *(A README link near the top, and the screenshot `https://andrewfooteqa.github.io/mock-llm/screenshot.png` (absolute; produced by the smoke test during the deploy) linking to the agent-loop lesson. `package.json` `homepage` is the Pages URL.)*
-- [ ] README links render correctly on the npm package page (relative repo links become absolute where npm wouldn't
+- [x] README links render correctly on the npm package page (relative repo links become absolute where npm wouldn't
       resolve them) (evidence: checked on npmjs.com after the release)
-      *(**Pending: the next npm release** (the npm page shows the README as published; 0.2.0's has no Pages link). npmjs.com blocks automated fetches (403), so this will be checked in a browser after 0.2.1.)*
-- [ ] Standard criteria: tests · README + Reference page ("where to find this online") · `CLAUDE.md` Layout and
+      *(Checked in a browser on npmjs.com/package/mock-llm (0.2.1): the "Docs & live playground →" link points at the Pages URL; the screenshot renders (proxied through camo); the sidebar Homepage is the Pages URL. All 71 README links are absolute: npm rewrites relative ones to `github.com/AndrewFooteQA/mock-llm/blob/HEAD/<path>`. Checking the 19 repo paths found one **stale link**, `examples/claude-code.mjs` (from before the example became `examples/claude-code-cli`). It's fixed, and `tests/unit/docs-links.test.ts` now fails on any relative link in the README files, CONTRIBUTING, RELEASING or CHANGELOG that points at a missing file (negative check: reintroducing it fails). The npm page picks up the fixed README at the next release.)*
+- [x] Standard criteria: tests · README + Reference page ("where to find this online") · `CLAUDE.md` Layout and
       definition of done (recordings and the static smoke test are part of `npm run check`) · `RELEASING.md` (Pages
       deploy step) · `npm run check`
-      *(Tests: `site.spec.mjs` (20), `tests/unit/playground-runs.test.ts` (4), `check.mjs` recording plus gap check. Docs: README (the Docs section, lesson count 14 → 17), the Reference "Where to find this online" section, CLAUDE.md (Layout, the relative-URL rule, the static site in check), RELEASING (the Pages step plus settings). `npm run check` green locally. **Pending: CI green on the final commit.**)*
+      *(Tests: `site.spec.mjs` (20), `tests/unit/playground-runs.test.ts` (4), `check.mjs` recording plus gap check. Docs: README (the Docs section, lesson count 14 → 17), the Reference "Where to find this online" section, CLAUDE.md (Layout, the relative-URL rule, the static site in check), RELEASING (the Pages step plus settings). `npm run check` green (275 tests, 310 recorded runs, 20 site tests, 9/9 examples, coverage gate). CI 37296922179 and Release 37296922260 green on `3b24ac8`.)*
 
 **Out of this item (on purpose):** running mock-llm itself in the browser (it needs Node's `http`/`http2`); a custom
 domain; versioned docs per release (only the latest release is published).

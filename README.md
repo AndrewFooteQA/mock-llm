@@ -152,7 +152,7 @@ setup works without the flag, is on the roadmap (R14). See [`examples/jest-trave
 
 ### Apps you don't construct directly (env vars)
 
-`mock.env()` returns `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `GOOGLE_GEMINI_BASE_URL`, `AWS_ENDPOINT_URL_BEDROCK_RUNTIME`, plus dummy keys and credentials. With these set, `new OpenAI()`, `new Anthropic()`, `new GoogleGenAI({})` and `new BedrockRuntimeClient({})` all reach the mock with no code changes. Pass them to a child process to test a whole service, a CLI or **Claude Code** itself (see [`examples/claude-code.mjs`](examples/claude-code.mjs)).
+`mock.env()` returns `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `GOOGLE_GEMINI_BASE_URL`, `AWS_ENDPOINT_URL_BEDROCK_RUNTIME`, plus dummy keys and credentials. With these set, `new OpenAI()`, `new Anthropic()`, `new GoogleGenAI({})` and `new BedrockRuntimeClient({})` all reach the mock with no code changes. Pass them to a child process to test a whole service, a CLI or **Claude Code** itself (see [`examples/claude-code-cli`](examples/claude-code-cli)).
 
 ## Scripting responses
 
