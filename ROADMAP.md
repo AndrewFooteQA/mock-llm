@@ -921,6 +921,22 @@ domain; versioned docs per release (only the latest release is published).
 
 ---
 
+### R21. Gemini continuation tokens (resumable generation)
+**Status:** Proposed (from the SDK update playbook, Renovate PR #8: `@google/genai` 2.26.0)
+**Depends on:** none
+**Goal:** apps that resume long Gemini generations can test that path: the model stops with
+`finishReason: CONTINUATION` and an opaque `continuationToken`, and the app sends `config.continuationToken` to continue.
+
+**Draft acceptance criteria** (to be agreed before work starts)
+- [ ] A reply can end in continuation: e.g. `reply(text, { stopReason: 'continuation' })`, the IR stop reason maps to
+      Gemini's `CONTINUATION` with a deterministic base64 `continuationToken` (seeded), streaming and non-streaming
+- [ ] A matcher for resume requests (e.g. `when({ continuationToken: true | string })`), plus YAML support
+- [ ] Other providers: documented as Gemini-only (no equivalent wire field), so the stop reason falls back to `max_tokens` there
+- [ ] Contract tests through `@google/genai` ≥ 2.26.0, gated with `sdkAtLeast` for the matrix floor
+- [ ] Standard criteria: README + playground lesson variant + an example use (the coverage gate will require one)
+
+**Amendments:** none
+
 ## Phase V2: Serious AI QA
 
 Each V2 item gets full checkbox criteria, written with the template above and agreed **before** it starts.
