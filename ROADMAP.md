@@ -617,7 +617,7 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 **Amendments:** none
 
 ### R19. Example coverage: examples as consumer tests, plus a coverage report
-**Status:** In progress (started 2026-10-04)
+**Status:** Ready for sign-off (2026-10-05)
 **Depends on:** none (waits for the item in progress, per the one-at-a-time rule)
 **Goal:** the examples are the only tests that install the *packed* package into separate projects and use it like a
 user. Make them cover what only they can catch (packaging and types, test-framework integration, real app patterns
@@ -649,9 +649,9 @@ for every provider), and make gaps visible with a script so coverage can't slip 
 **Acceptance criteria**
 
 *Honest results*
-- [ ] `claude-code-cli` runs in CI: the `check` job installs the Claude Code CLI, and the example asserts on the requests
+- [x] `claude-code-cli` runs in CI: the `check` job installs the Claude Code CLI, and the example asserts on the requests
       the mock saw (evidence: CI run link with the example's request list in the log)
-      *(`ci.yml` and `release.yml` install `@anthropic-ai/claude-code` before `npm run check`. The example asserts with plain-function matchers (prompt as user message, Claude model, reply printed) and prints the request list. Locally: 5/5 checks ✔. **Pending: CI run link.**)*
+      *(`ci.yml` and `release.yml` install `@anthropic-ai/claude-code` before `npm run check`. The example asserts with plain-function matchers (prompt as user message, Claude model, reply printed) and prints the request list. Locally: 5/5 checks ✔. **CI run 37289876266** (`2f93982`), check job log: `Claude Code 2.1.289`, `POST /v1/messages -> 200 (default)`, then ✔ for each of the 5 checks and `✔ claude-code-cli`. The first push (`d83cc92`) exposed that npm 12 (in the release job) blocks the CLI's postinstall; both workflows now install it with `--allow-scripts=@anthropic-ai/claude-code`.)*
 - [x] `scripts/test-examples.mjs` reports three outcomes, ✔ passed / ✘ failed / ⊘ skipped (with the reason). An example
       skips by exiting with a documented code (e.g. 77) instead of 0. `test:examples` fails on a skip when `CI=true`
       (evidence: output with the CLI absent locally showing ⊘; negative check: the same run with `CI=true` exits 1)
@@ -762,12 +762,12 @@ for every provider), and make gaps visible with a script so coverage can't slip 
       *(CLAUDE.md Examples: the coverage gate and how to exempt, `tsc` in examples (no `as any` / `as never`), and exit 77 for skips; Layout updated. CONTRIBUTING item 3 has an exemption example.)*
 
 *Wrap-up*
-- [ ] After the work above, `npm run coverage:examples` reports no uncovered items; exemptions are reviewed by the
+- [x] After the work above, `npm run coverage:examples` reports no uncovered items; exemptions are reviewed by the
       maintainer (evidence: the final table in the sign-off summary)
-      *(`199 features: 174 covered, 25 exempt, 0 uncovered`. **Pending: maintainer review of the 25 exemptions** (listed in the sign-off summary).)*
-- [ ] Standard criteria: tests · docs (README "Example projects", `examples/README.md`, Reference page example table,
+      *(`199 features: 174 covered, 25 exempt, 0 uncovered`. Same in CI (run 37289876266). The 25 exemptions are in the sign-off summary table for maintainer review; signing off accepts them.)*
+- [x] Standard criteria: tests · docs (README "Example projects", `examples/README.md`, Reference page example table,
       `CLAUDE.md`, `CONTRIBUTING.md`) · examples · `npm run check`
-      *(Tests: 271 library tests (+ the coverage, schema and needs-changeset suites), 9/9 examples, 305 lesson runs; `npm run check` green locally. Docs: the three indexes, 7 example READMEs plus the new one, README (Development, `fakeFromSchema`), Reference (`fakeFromSchema` row, example table), CLAUDE.md, CONTRIBUTING. **Pending: CI green after the push.**)*
+      *(Tests: 271 library tests (+ the coverage, schema and needs-changeset suites), 9/9 examples, 305 lesson runs; `npm run check` green locally. Docs: the three indexes, 7 example READMEs plus the new one, README (Development, `fakeFromSchema`), Reference (`fakeFromSchema` row, example table), CLAUDE.md, CONTRIBUTING. CI and Release are green on `2f93982` (runs 37289876266, 37289876438). Release opened Version Packages PR #10 (0.2.1).)*
 
 **Out of this item (on purpose):**
 - Oldest supported SDK versions: that's R17's compatibility matrix.
