@@ -1,6 +1,6 @@
 {
   "name": "mock-llm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "In-process mock of LLM provider APIs (OpenAI, Anthropic, Gemini, Bedrock) for testing apps with the official SDKs — no tokens spent.",
   "license": "MIT",
   "author": "AndrewFooteQA (https://github.com/AndrewFooteQA)",
