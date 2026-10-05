@@ -50,12 +50,13 @@
     "playground": "npm run build && node playground/server.mjs",
     "test:examples": "node scripts/test-examples.mjs",
     "playground:check": "npm run build && node playground/check.mjs",
-    "check": "npm run typecheck && node scripts/compat.mjs lint && npm test && npm run playground:check && npm run test:examples",
+    "check": "npm run typecheck && node scripts/compat.mjs lint && npm test && npm run playground:check && npm run test:examples && npm run coverage:examples",
     "pack:check": "npm run build && node scripts/check-pack.mjs && node scripts/smoke-pack.mjs",
     "changeset": "changeset",
     "release": "npm run pack:check && changeset publish",
     "verify:published": "node scripts/verify-published.mjs",
-    "compat": "node scripts/compat.mjs"
+    "compat": "node scripts/compat.mjs",
+    "coverage:examples": "node scripts/example-coverage.mjs"
   },
   "keywords": [
     "anthropic",

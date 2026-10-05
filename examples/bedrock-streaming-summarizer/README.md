@@ -8,10 +8,13 @@ Streaming summaries with `@aws-sdk/client-bedrock-runtime` (ConverseStream), tes
 - observe each binary frame as it's sent with `mock.on('chunk', …)` (decoded for you)
 - use **seeded random latency per rule** (`.latency({ firstTokenMs: { min, max } })`) and assert the recorded delay (`entry.latency`)
 - test **mid-stream connection drops**, **in-stream ThrottlingException**, **request-level throttling with SDK retries**, and **time to first token** with simulated latency
+- summarise without streaming through **Converse** and **InvokeModel** with Anthropic's native Messages body, stream through
+  **InvokeModelWithResponseStream**, and mark summaries cut off at `max_tokens` as truncated
+- observe a `fault` event, read the raw exchange from the journal's `wire` record, and give one step a `delay`
 
 ```sh
 npm install
-npm test
+npm test        # tsc --noEmit (strict, against mock-llm's published types), then vitest
 ```
 
 | File | What it is |

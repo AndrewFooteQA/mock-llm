@@ -1,8 +1,10 @@
-import type { Rng } from './rng.js';
+import { Rng } from './rng.js';
 
 export interface FakeOptions {
   /** Produce a value that violates the schema (missing required field / wrong type). */
   violate?: boolean;
+  /** Seed for the generated value (default 1): the same seed and schema always give the same value. */
+  seed?: number;
 }
 
 /**
@@ -11,7 +13,13 @@ export interface FakeOptions {
  * outputs and tool schemas use in practice: object/array/scalars, enum, const,
  * required, anyOf/oneOf/allOf, local $ref, formats, numeric/length bounds.
  */
-export function fakeFromSchema(schema: unknown, rng: Rng, opts: FakeOptions = {}): unknown {
+export function fakeFromSchema(schema: unknown, opts?: FakeOptions): unknown;
+/** With an explicit random source (how the rule engine calls it, sharing the mock's seeded stream). */
+export function fakeFromSchema(schema: unknown, rng: Rng, opts?: FakeOptions): unknown;
+export function fakeFromSchema(schema: unknown, rngOrOpts: Rng | FakeOptions = {}, maybeOpts: FakeOptions = {}): unknown {
+  const isRng = rngOrOpts instanceof Rng;
+  const opts = isRng ? maybeOpts : rngOrOpts;
+  const rng = isRng ? rngOrOpts : new Rng(opts.seed ?? 1);
   const root = (schema ?? {}) as Record<string, any>;
   const value = gen(root, root, rng, 0, 'value');
   return opts.violate ? violate(root, value, root) : value;

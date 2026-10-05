@@ -45,18 +45,27 @@ export class TravelAssistant {
     this.#model = model;
   }
 
-  async ask(question, { maxTurns = 4 } = {}) {
+  /** `onText`: stream each turn (`responses.stream()`) and receive the answer's text as it arrives. */
+  async ask(question, { maxTurns = 4, onText } = {}) {
     const toolsUsed = [];
     let input = question;
     try {
       for (let turn = 0; turn < maxTurns; turn++) {
-        const response = await this.#client.responses.create({
+        const params = {
           model: this.#model,
           instructions: INSTRUCTIONS,
           tools: TOOLS,
           input,
           ...(this.#lastResponseId && { previous_response_id: this.#lastResponseId }),
-        });
+        };
+        let response;
+        if (onText) {
+          const stream = this.#client.responses.stream(params);
+          stream.on('response.output_text.delta', (e) => onText(e.delta));
+          response = await stream.finalResponse();
+        } else {
+          response = await this.#client.responses.create(params);
+        }
         this.#lastResponseId = response.id;
 
         const refusal = response.output.flatMap((o) => (o.type === 'message' ? o.content : [])).find((p) => p.type === 'refusal');

@@ -11,10 +11,22 @@ rules:
     when: { lastUserMessage: "/hours|open/i" }
     reply: We're open 9am to 6pm, Monday to Saturday.
 
+  - name: beta-testers
+    # Requests a beta tester's client tags with x-request-id: beta-… (forwarded by the service).
+    when: { headers: { x-request-id: "/^beta-/" } }
+    reply: Thanks for testing the beta! This answer comes from the new assistant.
+
   - name: flaky-upstream
     when: { lastUserMessage: flaky }
     once: true
     fail: { overloaded: {} }
+
+# Picked per request with the `x-mock-scenario: vip` header (the service forwards it, see LLM_FORWARD_HEADERS).
+scenarios:
+  vip: { reply: "Welcome back! As a VIP you get free express shipping." }
+  echo: { echo: {} }                              # repeats the question back: a wiring check
+  filler: { lorem: { tokens: 30 } }               # deterministic placeholder text
+  structured: { json: { answer: Open daily, confidence: 0.9 } }
 
 default:
   reply: I'm not sure about that. Let me connect you with a human.

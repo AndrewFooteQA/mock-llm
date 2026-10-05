@@ -43,6 +43,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Install the Claude Code CLI for the claude-code-cli example (a skip fails CI)
+        run: npm install -g @anthropic-ai/claude-code && claude --version
       - name: Install Playwright browser for the playwright example
         run: |
           npm run build

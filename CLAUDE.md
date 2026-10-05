@@ -50,7 +50,16 @@ A change is not finished until all three parts are done, **in the same change**:
    - **Keep the three example indexes in sync.** When an example gains or loses a feature (a matcher, strict mode, events,
      …), update its row in all of: `examples/README.md` (full feature list), the root README "Example projects" table,
      and the Reference page's example table in `playground/public/app.js`. Write rows from what the example actually uses
-     (grep its tests), not from intent.
+     (`npm run coverage:examples -- --by-example` lists it), not from intent.
+   - **Every feature has an example or a recorded exemption.** `npm run coverage:examples` builds the feature inventory
+     from the source (exports, faults, edge cases, built-in scenarios, matchers, rule methods, options, matcher keys,
+     scenario-file steps, events), plus the provider SDK calls in `examples/coverage.json`. `npm run check` fails when
+     something is used by no example and isn't exempt. A new export, fault, matcher or option therefore needs an example
+     use, or an entry in `exempt` with a one-line reason (internal helpers only; the maintainer reviews exemptions).
+   - TypeScript examples type-check (`tsc --noEmit`, `strict`) before their tests: never silence a type error with
+     `as any` / `as never` in an example. Users copy them.
+   - An example that can't run in an environment (e.g. it needs a CLI) exits **77** to report ⊘ skipped, never 0.
+     `test:examples` fails on skips in CI.
 
 4. **Changeset** (`.changeset/`)
    - Any change to what ships (`src/`, `package.json` exports/peers/engines) gets a changeset: run
@@ -119,7 +128,8 @@ src/testing/       mock-llm/vitest + mock-llm/jest adapters (lifecycle + matcher
 tests/unit|contract  library tests (vitest.config.ts restricts the root run to tests/)
 playground/        docs + live tutorial (server.mjs, public/*, check.mjs)
 examples/          standalone starter projects, each with its own package.json and tests
-scripts/           repo tooling: test-examples, pack checks, verify-published, compat (matrix), sdk-surface-diff
+scripts/           repo tooling: test-examples, example-coverage, pack checks, verify-published, compat (matrix),
+                   sdk-surface-diff, needs-changeset
 compat/            targets.json (supported ranges + floors), results.json (last matrix results → README table)
 ```
 

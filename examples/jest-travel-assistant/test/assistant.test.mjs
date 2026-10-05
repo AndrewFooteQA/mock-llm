@@ -38,6 +38,21 @@ describe('TravelAssistant (OpenAI Responses API, tested with Jest)', () => {
     expect(mock).toHaveReceivedRequestTimes(3);
   });
 
+  it('streams a tool turn and the answer, matching the final response', async () => {
+    mock.when({}).replyToolCall('get_weather', { city: 'Lisbon' }).then.reply('Lisbon is 19°C and cloudy today.');
+
+    const deltas = [];
+    const result = await assistant().ask('Weather in Lisbon?', { onText: (d) => deltas.push(d) });
+
+    expect(result).toEqual({ text: 'Lisbon is 19°C and cloudy today.', toolsUsed: ['get_weather'] });
+    // The text came in several deltas, and together they are exactly what finalResponse() reported.
+    expect(deltas.length).toBeGreaterThan(1);
+    expect(deltas.join('')).toBe(result.text);
+    expect(mock).toHaveReceivedRequestTimes(2);
+    expect(mock.journal.all().map((e) => e.request.stream)).toEqual([true, true]);
+    expect(mock).toHaveReturnedToolResult('get_weather', { tempC: 19, conditions: 'cloudy' });
+  });
+
   it('remembers the conversation through previous_response_id', async () => {
     mock.when('Lisbon').reply('Lisbon is lovely in spring.');
     mock.when('flights').replyTemplate('You asked: {{lastUserMessage}}');

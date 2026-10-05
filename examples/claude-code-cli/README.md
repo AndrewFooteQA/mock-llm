@@ -6,7 +6,12 @@ shells out to Claude Code (CI bots, scripts, agent harnesses) without spending t
 ```sh
 npm install
 npm start      # show Claude Code's output and the requests the mock received
-npm test       # assert it completed (skips if `claude` isn't installed)
+npm test       # assert on what Claude Code sent and printed
 ```
+
+`npm test` checks the session with mock-llm's assertions as plain functions: the prompt arrived as the user message, a
+Claude model was used, and the scripted reply was printed. Without the `claude` CLI on PATH it exits **77**, the
+conventional "skipped" code, so `npm run test:examples` reports ⊘ instead of a pass. CI installs the CLI
+(`npm install -g @anthropic-ai/claude-code`), where a skip fails the run.
 
 The same pattern works for any process: spread `mock.env()` into the child's environment.

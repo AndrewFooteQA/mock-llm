@@ -517,7 +517,7 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
   installs with `--prefer-online`.
 
 ### R17. Dependency watch & compatibility matrix
-**Status:** Ready for sign-off (2026-10-04)
+**Status:** Signed off: 2026-10-04
 **Depends on:** R16 (repo + CI)
 **Goal:** know within a week when a third party releases, what it affects, and prove which versions we support.
 **Acceptance criteria**
@@ -617,7 +617,7 @@ Key fact: mock-llm has **zero runtime dependencies**. SDKs are dev dependencies 
 **Amendments:** none
 
 ### R19. Example coverage: examples as consumer tests, plus a coverage report
-**Status:** Proposed
+**Status:** In progress (started 2026-10-04)
 **Depends on:** none (waits for the item in progress, per the one-at-a-time rule)
 **Goal:** the examples are the only tests that install the *packed* package into separate projects and use it like a
 user. Make them cover what only they can catch (packaging and types, test-framework integration, real app patterns
@@ -651,60 +651,81 @@ for every provider), and make gaps visible with a script so coverage can't slip 
 *Honest results*
 - [ ] `claude-code-cli` runs in CI: the `check` job installs the Claude Code CLI, and the example asserts on the requests
       the mock saw (evidence: CI run link with the example's request list in the log)
-- [ ] `scripts/test-examples.mjs` reports three outcomes, ✔ passed / ✘ failed / ⊘ skipped (with the reason). An example
+      *(`ci.yml` and `release.yml` install `@anthropic-ai/claude-code` before `npm run check`. The example asserts with plain-function matchers (prompt as user message, Claude model, reply printed) and prints the request list. Locally: 5/5 checks ✔. **Pending: CI run link.**)*
+- [x] `scripts/test-examples.mjs` reports three outcomes, ✔ passed / ✘ failed / ⊘ skipped (with the reason). An example
       skips by exiting with a documented code (e.g. 77) instead of 0. `test:examples` fails on a skip when `CI=true`
       (evidence: output with the CLI absent locally showing ⊘; negative check: the same run with `CI=true` exits 1)
+      *(✔ / ✘ / ⊘. `claude-code-cli` exits 77 without the CLI. With the CLI absent (PATH without `claude`): `⊘ claude-code-cli (skipped: see its output above)`, exit 0. **Negative:** the same with `CI=true` → `✘ 1 example(s) skipped, which is not allowed in CI`, exit 1. With the CLI: ✔. `compat.mjs` and `verify-published.mjs` record 77 as a skip, not a failure.)*
 
 *Types checked like a user's project*
-- [ ] Each TypeScript example has a `tsconfig.json` (`strict`, `noEmit`, `moduleResolution: bundler` or `nodenext`) and
+- [x] Each TypeScript example has a `tsconfig.json` (`strict`, `noEmit`, `moduleResolution: bundler` or `nodenext`) and
       its `test` script runs `tsc --noEmit` before the tests (evidence: `npm test` output in each)
-- [ ] The type check covers the matcher augmentations (`expect(mock).toHaveToolTrajectory(...)`), `MockLLMOptions`,
+      *(`bedrock-streaming-summarizer`, `claude-tool-agent`, `gemini-structured-extraction`, `openai-support-bot` and the new `rag-knowledge-base` each have `tsconfig.json` (`strict`, `noEmit`, `NodeNext`) and `"test": "tsc --noEmit && vitest run"`; `tsc` is clean in all five. It caught three real mistakes while writing the examples: an invalid `EntryFilter` key, `CostReport.totalUsd` (→ `total`), and an `as never` hack, now removed.)*
+- [x] The type check covers the matcher augmentations (`expect(mock).toHaveToolTrajectory(...)`), `MockLLMOptions`,
       `ReplyOptions`, scenario-file types (`ScenarioFile`) and `JournalEntry` fields the tests read (evidence: a
       deliberately wrong matcher argument fails `tsc` in one example; record the error, then revert)
+      *(Typed uses: matchers throughout, `MockLLMOptions` (rag), `ReplyOptions` and `JournalEntry` (claude-tool-agent, openai-support-bot), `ScenarioFile` (openai-support-bot baseline test). **Negative:** `toHaveToolTrajectory(42, [...])` in claude-tool-agent → `error TS2345: Argument of type 'number' is not assignable to parameter of type '(string | ToolStep)[]'`; reverted.)*
 
 *Streaming through every chat SDK*
-- [ ] `claude-tool-agent`: the app streams its final answer with `messages.stream()`; the test checks the accumulated
+- [x] `claude-tool-agent`: the app streams its final answer with `messages.stream()`; the test checks the accumulated
       text and `finalMessage()`, including a tool-use turn delivered by streaming
-- [ ] `gemini-structured-extraction`: a streamed extraction with `generateContentStream`, plus one mid-stream error
+      *(`runAgent(..., { stream: true, onText })` uses `messages.stream()` + `finalMessage()`. The test `streams every turn, including a tool-use turn…` checks the tool call reassembled from streamed input, deltas in order (more than 2 pieces) and both turns with `stream: true`.)*
+- [x] `gemini-structured-extraction`: a streamed extraction with `generateContentStream`, plus one mid-stream error
       (`faults.streamError`) that the app reports
-- [ ] `jest-travel-assistant`: a streamed Responses turn (`responses.stream()`), checked against `finalResponse()`
+      *(`extractInvoiceStreaming` (`generateContentStream`, progress callback). Tests: exact chunks → invoice plus progress `[30, 80, n]`. `faults.streamError({ afterChunks: 2, overloaded })` → `ExtractionError` "stopped part-way… (HTTP 503)".)*
+- [x] `jest-travel-assistant`: a streamed Responses turn (`responses.stream()`), checked against `finalResponse()`
+      *(`ask(q, { onText })` uses `responses.stream()` + `finalResponse()`. The test streams a tool turn and the answer: deltas (more than 1) joined equal the final text, both requests `stream: true`.)*
 
 *Non-chat endpoints: new example `rag-knowledge-base`*
-- [ ] A new standalone example: a small retrieval-augmented app that embeds documents, ranks them by cosine similarity
+- [x] A new standalone example: a small retrieval-augmented app that embeds documents, ranks them by cosine similarity
       and answers with the top passages in the prompt. Its app code (`src/`) contains nothing mock-specific
-- [ ] It covers embeddings through OpenAI (default base64 encoding *and* `encoding_format: 'float'`), Gemini AI Studio
+      *(`examples/rag-knowledge-base`: `src/embedders.ts`, `tokens.ts`, `kb.ts` (cosine index, budgeted answer, `pickModel`), nothing mock-specific. 14 tests. The README explains that mock embeddings are deterministic but not semantic, so the FAQ matches question to question.)*
+- [x] It covers embeddings through OpenAI (default base64 encoding *and* `encoding_format: 'float'`), Gemini AI Studio
       (`embedContent`, batch) and Gemini Vertex AI (`:predict`, with a static OAuth token as in
       `tests/contract/gemini.test.ts`), and Bedrock (Titan or Cohere embeddings via InvokeModel)
-- [ ] It covers token counting before sending (`countTokens` on Anthropic, Gemini and Bedrock CountTokens), with the app
+      *(`it.each` over OpenAI base64 / `float`, Gemini AI Studio batch, Gemini **Vertex** `text-embedding-005` → `:predict` (OAuth `Bearer test-token`, path asserted) and Bedrock Titan v2 via InvokeModel. Base64 and float decode to the same vectors (`encoding_format` recorded as `base64` / `float`).)*
+- [x] It covers token counting before sending (`countTokens` on Anthropic, Gemini and Bedrock CountTokens), with the app
       trimming context to a budget, plus `models.list` used to pick a model
-- [ ] It asserts the top passages reached the prompt (`toHaveReceivedPrompt`) and the cost stayed under a budget
+      *(Anthropic `messages.countTokens`, Gemini `models.countTokens`, Bedrock `CountTokens`: each positive and grows with the prompt. `answer()` drops the lowest-ranked passages until the prompt fits (a 60-token budget → fewer than 4 passages, the best one kept). `pickModel` uses `models.list` with the `models` option; a mock listing no Claude model → a clear error.)*
+- [x] It asserts the top passages reached the prompt (`toHaveReceivedPrompt`) and the cost stayed under a budget
       (`toCostLessThan`, `journal.cost()` with a custom `pricing` entry)
-- [ ] Listed in all three example indexes: `examples/README.md`, the README "Example projects" table and the Reference
+      *(`toHaveReceivedPrompt('[1] <reset passage>', { in: 'user' })`, the system prompt, `toCostLessThan(0.01)`, `journal.cost()` with `unpriced: []`, and `byModel['claude-sonnet-5-5'].usd === total` under custom `pricing`.)*
+- [x] Listed in all three example indexes: `examples/README.md`, the README "Example projects" table and the Reference
       page's example table in `playground/public/app.js`
+      *(Rows in `examples/README.md`, the README "Example projects" and the Reference page. All three tables were rewritten from `coverage:examples --by-example`.)*
 
 *Lifecycle and scripting*
-- [ ] `openai-support-bot` (or `claude-tool-agent`): a shared YAML baseline via `useMockLLM({ scenarioFiles, strict: true })`
+- [x] `openai-support-bot` (or `claude-tool-agent`): a shared YAML baseline via `useMockLLM({ scenarioFiles, strict: true })`
       used by **at least three tests**; each later test relies on the baseline (including a sequence or `once` rule
       starting over) and adds its own `when()` override (evidence: removing the reapply from `reset()` makes these
       tests fail; record it, then restore)
-- [ ] A Vitest test with an expectation step **and** strict mode, with the app's error swallowed, that fails for the
+      *(`test/baseline.test.ts` + `test/scenarios/support-baseline.yaml`, `useMockLLM({ scenarioFiles, strict: true })`, 8 tests: the sequence restarts in the next test, the `once` outage fires again, a `when()` override wins and doesn't leak, typed `ScenarioFile` loaded on top. **Negative:** with the re-apply removed from `reset()` (`src/mock.ts`), 7/8 fail (the first passes because `start()` applies it once); restored, 20/20 pass.)*
+- [x] A Vitest test with an expectation step **and** strict mode, with the app's error swallowed, that fails for the
       expected reason, checked with a posttest script like playwright-chat-ui's `check-expected-failures.mjs`
-- [ ] `x-mock-scenario` header used by one app that forwards it (e.g. `node-service-e2e` passes a request header through)
+      *(`test/should-fail/strict-expectation.ts` (outside the default include), run by the `posttest` `check-expected-failures.mjs`, which requires a non-zero exit and both reports (`SCENARIO EXPECTATION FAILED` with `rules[0] ("refund") › steps[0]: expectRequest`, and `UNEXPECTED LLM REQUEST` naming the question). **Negative:** with the expectation made to pass → `✘ … missing /SCENARIO EXPECTATION FAILED…/`, exit 1. Note: `it.fails` was tried first; it reports "passed" with no failure message, so it can't verify the reason.)*
+- [x] `x-mock-scenario` header used by one app that forwards it (e.g. `node-service-e2e` passes a request header through)
+      *(`node-service-e2e`: the service forwards the headers listed in `LLM_FORWARD_HEADERS` on each SDK call (a generic tracing pattern, nothing mock-specific). Tests: `x-mock-scenario: vip` (QA file scenario) plus `x-request-id` asserted via `toHaveReceivedRequest({ headers })`, `rate-limit` → 503, and a sweep of **every built-in scenario** (each gives a reply or a clean 503). The sweep found the service had no LLM timeout (SDK default 10 min); it now has `LLM_TIMEOUT_MS`.)*
 
 *Faults and awkward outputs*
-- [ ] `connectionReset` and `server` (500): the app retries or degrades; the test asserts the SDK's retry count from the journal
-- [ ] `auth`: a mock started with `apiKeys` and an app configured with the wrong key shows a "check your API key" error
+- [x] `connectionReset` and `server` (500): the app retries or degrades; the test asserts the SDK's retry count from the journal
+      *(openai-support-bot: reset, then 500, then the reply with `maxRetries: 2`; journal `['reset', 500, 200]`. Reset every time with `maxRetries: 1` → `unavailable` after 2 requests.)*
+- [x] `auth`: a mock started with `apiKeys` and an app configured with the wrong key shows a "check your API key" error
       (the SDK's 401 class)
-- [ ] `faults.contextLength` scripted directly (separate from the `contextWindow` option already covered)
-- [ ] `{ thinking }` in `claude-tool-agent`: the app hides reasoning from the user but logs it; the test checks both
+      *(A second mock with `apiKeys: ['sk-right']`: the wrong key → `{ kind: 'misconfigured', text: '…(check the API key).' }`, journal `[401]` (no retry); the right key → answer. A scripted `faults.authError()` → the same.)*
+- [x] `faults.contextLength` scripted directly (separate from the `contextWindow` option already covered)
+      *(`faults.contextLengthExceeded({ details: { limit: 8192, inputTokens: 9001 } })` on a short question → `too_long`.)*
+- [x] `{ thinking }` in `claude-tool-agent`: the app hides reasoning from the user but logs it; the test checks both
+      *(`reply(text, { thinking })` typed as `ReplyOptions`: the answer excludes the reasoning and `log` received `thinking: …`, both non-streaming and streaming. Requests carry `thinking: { type: 'adaptive' }` (from `request.raw`).)*
 
 *Provider surface*
-- [ ] `bedrock-streaming-summarizer` adds non-streaming Converse and InvokeModel with a Claude body (summary length
+- [x] `bedrock-streaming-summarizer` adds non-streaming Converse and InvokeModel with a Claude body (summary length
       limits via `max_tokens` → `stopReason: 'max_tokens'`)
-- [ ] `gemini-structured-extraction` runs one extraction through a Vertex AI client as well as AI Studio
+      *(`summarizeOnce` (Converse) and `summarizeWithInvokeModel` (Claude Messages body). `describe.each` checks the full text, `maxTokens: 200` sent, and `edge.truncated` → `stopReason: 'max_tokens'`, `truncated: true`. Also `streamWithInvokeModel` (InvokeModelWithResponseStream).)*
+- [x] `gemini-structured-extraction` runs one extraction through a Vertex AI client as well as AI Studio
+      *(The Vertex AI test: `vertexai: true`, static OAuth token; journal path `/projects/my-project/locations/europe-west4/publishers/google/models/gemini-2.5-flash:generateContent`, `authorization: Bearer test-token`.)*
 
 *Coverage report script*
-- [ ] `scripts/example-coverage.mjs` (`npm run coverage:examples`) builds a **feature inventory** from the source, not
+- [x] `scripts/example-coverage.mjs` (`npm run coverage:examples`) builds a **feature inventory** from the source, not
       from a hand-kept list:
       - exported values from `src/index.ts`
       - keys of `faults`, `edge` and `builtinScenarios`
@@ -713,38 +734,65 @@ for every provider), and make gaps visible with a script so coverage can't slip 
       - `MockLLMOptions` and `Matcher` keys (read from the TypeScript source)
       - scenario-file step actions and modifiers (`scenario-file.ts`)
       - event names (`MockLLMEvents`)
-- [ ] Plus a small **SDK-surface map** in `examples/coverage.json` for things the inventory can't see:
+      *(Extracted from source: `exportedValues(src/index.ts)` (value exports only) plus each test-framework entry point's exports; `topLevelKeys` of `faults`, `edge`, `builtinScenarios`, `assertions`, `RuleBuilder`, `MockLLMOptions`, `Matcher` and `MockLLMEvents`; `ACTIONS` / `MODIFIERS` from `scenario-file.ts`. 199 features. Braces in strings and comments are masked.)*
+- [x] Plus a small **SDK-surface map** in `examples/coverage.json` for things the inventory can't see:
       - feature → patterns, per provider and SDK call (e.g. `anthropic.stream` → `/messages\.stream\(/`;
         `bedrock.invokeModel` → `/InvokeModelCommand/`; `gemini.vertex` → `/vertexai:\s*true/`)
       - endpoints (embeddings, countTokens, models) per provider
-- [ ] It scans each example's tests, app code, scenario files and config. Generated, lock and `node_modules` files are
+      *(`examples/coverage.json` › `surface`: 21 SDK calls and endpoints (chat and stream per provider, Responses, embeddings, countTokens, models, Vertex, InvokeModel (+stream), Claude Code).)*
+- [x] It scans each example's tests, app code, scenario files and config. Generated, lock and `node_modules` files are
       skipped. It reports each feature as **covered** (with the examples and files that use it), **exempt** (listed in
       `examples/coverage.json` with a one-line reason, e.g. `effectiveSeed`: internal helper) or **uncovered**
-- [ ] Output: a readable table grouped by area (default), `--json` for tooling, and a per-example feature list to check
+      *(`filesOf` skips `node_modules`, `test-results`, `dist`, lockfiles, READMEs and `tsconfig*.json` (whose `"strict": true` had falsely counted as the `strict` option). Exports count only when imported from `mock-llm` (a comment mentioning `assertions` had counted).)*
+- [x] Output: a readable table grouped by area (default), `--json` for tooling, and a per-example feature list to check
       the three example indexes against (rows written from use, per `CLAUDE.md`)
-- [ ] Gate: `examples/coverage.json` has a `required` list (initially: every fault, every provider's chat
+      *(Default: a table per area with examples per feature; `--json`; `--by-example` (used to rewrite the three indexes).)*
+- [x] Gate: `examples/coverage.json` has a `required` list (initially: every fault, every provider's chat
       non-streaming + streaming, embeddings per provider, the three test-framework adapters, strict mode, scenario
       files, expectation steps). Exit 1 if a required feature is uncovered or an inventory item is neither covered nor
       exempt, so a **new export, fault, matcher or option** fails the check until an example uses it or it's exempted
       with a reason. Runs in `npm run check` (after `test:examples`) and in CI
-- [ ] Unit tests for the script in `tests/unit/` (inventory extraction from fixtures, pattern matching, exempt and
+      *(`required`: all 14 faults, chat and stream for all 4 providers (plus Responses), embeddings for 3 providers, the 3 adapters, `strict`, `scenarioFiles`, `expectRequest` / `expectToolResult`, `toHaveMetExpectations`. It runs in `npm run check` after `test:examples` (so in CI's `check` job).)*
+- [x] Unit tests for the script in `tests/unit/` (inventory extraction from fixtures, pattern matching, exempt and
       required handling, exit codes). Negative checks recorded: deleting a fault's only example use fails with that
       fault named; adding an unused export fails until exempted
-- [ ] `CLAUDE.md` definition of done (Examples section) and `CONTRIBUTING.md` mention the script and how to exempt a
+      *(`tests/unit/example-coverage.test.ts` (9): extraction from fixtures (strings, comments, nesting, type-only exports), the real source, covered / exempt / uncovered, stale exemptions, the surface map. **Negatives on the real repo:** removing the only `faults.raw` use → `required feature "fault:raw" is not used by any example`, exit 1. Adding `export { approxTokens as estimateTokens }` → `"export:estimateTokens" is neither used by an example nor exempt`, exit 1. Both restored → exit 0.)*
+- [x] `CLAUDE.md` definition of done (Examples section) and `CONTRIBUTING.md` mention the script and how to exempt a
       feature
+      *(CLAUDE.md Examples: the coverage gate and how to exempt, `tsc` in examples (no `as any` / `as never`), and exit 77 for skips; Layout updated. CONTRIBUTING item 3 has an exemption example.)*
 
 *Wrap-up*
 - [ ] After the work above, `npm run coverage:examples` reports no uncovered items; exemptions are reviewed by the
       maintainer (evidence: the final table in the sign-off summary)
+      *(`199 features: 174 covered, 25 exempt, 0 uncovered`. **Pending: maintainer review of the 25 exemptions** (listed in the sign-off summary).)*
 - [ ] Standard criteria: tests · docs (README "Example projects", `examples/README.md`, Reference page example table,
       `CLAUDE.md`, `CONTRIBUTING.md`) · examples · `npm run check`
+      *(Tests: 271 library tests (+ the coverage, schema and needs-changeset suites), 9/9 examples, 305 lesson runs; `npm run check` green locally. Docs: the three indexes, 7 example READMEs plus the new one, README (Development, `fakeFromSchema`), Reference (`fakeFromSchema` row, example table), CLAUDE.md, CONTRIBUTING. **Pending: CI green after the push.**)*
 
 **Out of this item (on purpose):**
 - Oldest supported SDK versions: that's R17's compatibility matrix.
 - Parallel Playwright workers: R15.
 - Testing against real provider APIs: R18.
 
-**Amendments:** none
+**Amendments:**
+- *A library bug found by the coverage work:* `fakeFromSchema` was exported but required an `Rng`, which isn't exported, so
+  users couldn't call it. It now takes `fakeFromSchema(schema, { seed, violate })` (the `Rng` form still works), is
+  documented, and has a regression test. Changeset `fake-from-schema.md` (patch).
+- *An example bug found by the scenario sweep:* `node-service-e2e` had no LLM timeout, so the `timeout` scenario hung it
+  for the SDK default of 10 minutes. It now has `LLM_TIMEOUT_MS`, set to 3 s in tests, which is longer than a 429's
+  1 s `retry-after` plus the retry. At 1 s, rate limits surfaced as timeouts.
+- *Vitest expected failures* use a separate `test/should-fail/` suite and a `posttest` checker rather than `it.fails`.
+  `it.fails` reports "passed" with no message when useMockLLM's afterEach throws, so it can't check the reason.
+- *Mock embeddings aren't semantic* (deterministic per text). `rag-knowledge-base` ranks by exact question match and
+  says so in its README. Retrieval quality is out of scope (evals).
+- *Scenario coverage:* one sweep over `Object.keys(builtinScenarios)` counts as covering every built-in scenario,
+  because it does run each one through a real service.
+- *Also covered beyond the list:* `streamWithInvokeModel` (InvokeModelWithResponseStream), `responses.stream()`,
+  `onUnmatched: 'error'`, `times()`, `inject`, `replyEcho`, the `unmatched` / `fault` events, the `wire` record,
+  per-step `delay`, scripted `usage`, the `models` option, and YAML `echo` / `lorem` / `json` / header routing.
+- *Exemptions (25)* are listed with reasons in `examples/coverage.json`, for maintainer review.
+- *0.2.0 was published* during this item (from the merged R17 work). Its CI post-publish verification passed with the
+  `--prefer-online` fix, which was deferred from R16 and is now proven in CI.
 
 ### R20. Hosted playground on GitHub Pages
 **Status:** Proposed

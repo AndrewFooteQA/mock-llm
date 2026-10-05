@@ -169,6 +169,9 @@ mock.default().reply('fallback');                                  // when nothi
 
 `replyFromSchema` reads the schema from OpenAI `response_format` / `text.format`, Anthropic `output_config.format`, or Gemini `responseSchema` / `responseJsonSchema`. It supports objects, arrays, enums, `const`, `anyOf`/`oneOf`/`allOf`, local `$ref`, common `format`s and numeric/length bounds (including draft-04 boolean and draft-06+ numeric `exclusiveMinimum` / `exclusiveMaximum`). `{ violate: true }` always produces a value that fails validation: it drops a required field, or else gives a property the wrong type, or else returns a non-object.
 
+The same generator is exported for your own fixtures, e.g. to unit-test a validator: `fakeFromSchema(schema, { seed, violate })`
+returns a deterministic value. The same schema and seed always give the same value, and the default seed is 1.
+
 **Matchers:** `provider`, `model`, `lastUserMessage`, `system`, `anyMessage` (string = substring, or RegExp; a `g` / `y` flag is harmless, since every request is tested from the start), `hasTools`, `tool` (a tool with this name is offered), `tools` (all of these tools are offered), `hasToolResult`, `turn`, `stream`, `responseFormat`, `headers`, and `where: (req) => boolean`.
 
 **Model globs:** a `model` string containing `*` or `?` is a glob over the whole model id, so one rule can cover a family across providers:
@@ -643,19 +646,22 @@ Token counts are approximate (~4 chars/token): good for budget assertions, not b
 
 ## Example projects
 
-[`examples/`](examples) has standalone starter projects, one per provider plus an end-to-end service and Claude Code.
-Each pairs real app code with a test suite. Run them all with `npm run test:examples`.
+[`examples/`](examples) has standalone starter projects, one per provider plus RAG, an end-to-end service and Claude Code.
+Each pairs real app code with a test suite, and the TypeScript ones type-check against the published types (`strict`).
+Run them all with `npm run test:examples`. `npm run coverage:examples` reports which library features they use, and
+`npm run check` fails when a feature has no example and no recorded exemption.
 
 | Example | Also shows |
 |---|---|
-| [`openai-support-bot`](examples/openai-support-bot) | Strict mode, context window, seeded chaos (errors + content), request/prompt/token matchers |
-| [`claude-tool-agent`](examples/claude-tool-agent) | Tool trajectory and tool result matchers, model-glob + `tools` rules |
-| [`gemini-structured-extraction`](examples/gemini-structured-extraction) | Schema-generated output, schema violations, request/prompt matchers |
-| [`bedrock-streaming-summarizer`](examples/bedrock-streaming-summarizer) | Binary event stream, events (`mock.on('chunk')`), per-rule seeded latency, request matcher |
-| [`node-service-e2e`](examples/node-service-e2e) | `node:test`, `mock.env()`, YAML scenario file with expectation steps, assertions as plain functions |
-| [`jest-travel-assistant`](examples/jest-travel-assistant) | **Jest** (ESM), OpenAI Responses API tool loop + memory, strict mode, matchers |
+| [`openai-support-bot`](examples/openai-support-bot) | Every fault, retries counted from the journal, awkward outputs, strict mode, a shared YAML baseline across tests, an expectation step failing for the checked reason, chaos |
+| [`claude-tool-agent`](examples/claude-tool-agent) | `messages.stream()` incl. streamed tool turns, `{ thinking }`, tool matchers, routing on conversation shape |
+| [`gemini-structured-extraction`](examples/gemini-structured-extraction) | Schema output and violations, `generateContentStream` + mid-stream error, Vertex AI, `fakeFromSchema` |
+| [`bedrock-streaming-summarizer`](examples/bedrock-streaming-summarizer) | Converse / ConverseStream / InvokeModel (+ stream), events incl. `fault`, the `wire` record, latency |
+| [`node-service-e2e`](examples/node-service-e2e) | `node:test`, `mock.env()`, YAML QA scenarios, forwarded `x-mock-scenario`, a sweep of every built-in scenario |
+| [`jest-travel-assistant`](examples/jest-travel-assistant) | **Jest** (ESM), OpenAI Responses API tool loop, `responses.stream()`, memory, strict mode, matchers |
 | [`playwright-chat-ui`](examples/playwright-chat-ui) | **Playwright** full-stack: server + browser-direct calls, `routeBrowser`, real-provider guard, strict mode, async matchers, mid-stream UI via exact chunks |
-| [`claude-code-cli`](examples/claude-code-cli) | The real Claude Code CLI against the mock |
+| [`rag-knowledge-base`](examples/rag-knowledge-base) | Embeddings on every provider (incl. Vertex), token counting, `models.list`, cost with custom pricing |
+| [`claude-code-cli`](examples/claude-code-cli) | The real Claude Code CLI against the mock, asserting on what it sent |
 
 The full feature list per example is in [`examples/README.md`](examples/README.md).
 
@@ -685,7 +691,9 @@ Each run starts a fresh mock and calls it with the official SDK for the provider
 npm install
 npm test                  # unit + contract tests (official SDKs against the mock)
 npm run playground:check  # every tutorial lesson × variant × provider
-npm run test:examples     # every example project, against a fresh build (Playwright example: run `npx playwright install chromium` once)
+npm run test:examples     # every example project, against a fresh build (Playwright example: run `npx playwright install chromium` once;
+                          # claude-code-cli skips (⊘) without the `claude` CLI)
+npm run coverage:examples # which library features the examples use; fails on a feature with no example or exemption
 npm run check             # all of the above + typecheck
 ```
 

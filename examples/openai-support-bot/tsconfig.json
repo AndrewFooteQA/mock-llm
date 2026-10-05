@@ -1,0 +1,13 @@
+{
+  // Type-check the app and its tests the way a user's project would: strict, against mock-llm's published .d.ts.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

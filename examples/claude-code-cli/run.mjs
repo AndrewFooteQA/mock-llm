@@ -1,14 +1,19 @@
 // Run the real Claude Code CLI against mock-llm, so no tokens are spent.
 //   npm start          → print Claude Code's output and the requests the mock saw
-//   npm test           → same, but assert on the result (skips if `claude` isn't installed)
+//   npm test           → same, but assert on the result
+// Without the `claude` CLI on PATH it exits 77, the conventional "skipped" code: test runners (and this repo's
+// `npm run test:examples`) report a skip instead of a pass. Install: npm install -g @anthropic-ai/claude-code
 import { spawn, spawnSync } from 'node:child_process';
-import { createMockLLM } from 'mock-llm';
+import { createMockLLM, toHaveReceivedPrompt, toHaveReceivedRequest } from 'mock-llm';
 
+const SKIPPED = 77;
 const check = process.argv.includes('--check');
-if (spawnSync('claude', ['--version'], { stdio: 'ignore' }).error) {
-  console.log('Claude Code CLI (`claude`) not found on PATH; skipping. Install: https://claude.com/claude-code');
-  process.exit(0);
+const version = spawnSync('claude', ['--version'], { encoding: 'utf8' });
+if (version.error) {
+  console.log('Claude Code CLI (`claude`) not found on PATH; skipping. Install: npm install -g @anthropic-ai/claude-code');
+  process.exit(SKIPPED);
 }
+console.log(`Claude Code ${version.stdout.trim()}`);
 
 const REPLY = 'Hello from mock-llm! No tokens were spent.';
 const mock = await createMockLLM();
@@ -32,7 +37,16 @@ for (const e of mock.journal.all()) console.log(`  ${e.method} ${e.path} -> ${e.
 await mock.stop();
 
 if (check) {
-  const ok = code === 0 && out.includes(REPLY) && messages.length > 0 && messages.every((e) => e.status === 200);
+  // Assert on what Claude Code actually sent, with the same framework-agnostic assertions the matchers use.
+  const checks = [
+    ['claude exited 0', code === 0],
+    ['printed the scripted reply', out.includes(REPLY)],
+    ['every Messages request succeeded', messages.length > 0 && messages.every((e) => e.status === 200)],
+    ['sent the prompt "say hi" as the user message', toHaveReceivedPrompt(mock, 'say hi', { in: 'user' }).pass],
+    ['used a Claude model on the Anthropic API', toHaveReceivedRequest(mock, { provider: 'anthropic', model: /claude/ }).pass],
+  ];
+  for (const [name, pass] of checks) console.log(`  ${pass ? '✔' : '✘'} ${name}`);
+  const ok = checks.every(([, pass]) => pass);
   console.log(ok ? '\n✔ Claude Code completed a session against mock-llm' : '\n✘ unexpected result');
   process.exit(ok ? 0 : 1);
 }

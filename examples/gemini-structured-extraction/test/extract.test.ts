@@ -1,8 +1,9 @@
 import { GoogleGenAI } from '@google/genai';
-import { edge } from 'mock-llm';
+import { OAuth2Client } from 'google-auth-library';
+import { edge, fakeFromSchema, faults } from 'mock-llm';
 import { useMockLLM } from 'mock-llm/vitest';
 import { describe, expect, it } from 'vitest';
-import { ExtractionError, extractInvoice, INVOICE_SCHEMA, validateInvoice } from '../src/extract.js';
+import { ExtractionError, extractInvoice, extractInvoiceStreaming, INVOICE_SCHEMA, validateInvoice } from '../src/extract.js';
 
 const mock = useMockLLM({ seed: 42 });
 const ai = () => new GoogleGenAI({ apiKey: 'test', httpOptions: { baseUrl: mock.urls.gemini } });
@@ -63,5 +64,53 @@ describe('extractInvoice', () => {
     mock.when({}).reply(edge.contentFilter());
     await expect(extractInvoice(ai(), 'text')).rejects.toThrow(/safety/);
     expect(mock).toHaveReceivedRequestTimes(1);
+  });
+});
+
+describe('validateInvoice (fixtures generated from the schema)', () => {
+  // The same generator the mock uses for replyFromSchema, called directly: deterministic per seed.
+  it.each([1, 2, 3, 4, 5])('accepts a schema-valid invoice and rejects a violating one (seed %i)', (seed) => {
+    expect(validateInvoice(fakeFromSchema(INVOICE_SCHEMA, { seed }))).toEqual([]);
+    expect(validateInvoice(fakeFromSchema(INVOICE_SCHEMA, { seed, violate: true })).length).toBeGreaterThan(0);
+  });
+});
+
+describe('extractInvoiceStreaming', () => {
+  it('assembles the streamed JSON, reporting progress as it arrives', async () => {
+    // Exact chunks: the JSON arrives in fragments, as it does from the real API.
+    const json = JSON.stringify(INVOICE);
+    const thirds = [json.slice(0, 30), json.slice(30, 80), json.slice(80)];
+    mock.when({}).reply({ chunks: thirds });
+
+    const progress: number[] = [];
+    const invoice = await extractInvoiceStreaming(ai(), 'Invoice INV-42 from Acme…', { onProgress: (n) => progress.push(n) });
+    expect(invoice).toEqual(INVOICE);
+    expect(progress).toEqual([30, 80, json.length]);
+    expect(mock).toHaveReceivedRequest({ stream: true, responseFormat: { type: 'json_schema' } });
+  });
+
+  it('reports a stream that fails part-way instead of returning a partial invoice', async () => {
+    // Two chunks of the stream, then Gemini's native in-stream error (overloaded = 503 UNAVAILABLE).
+    mock.when({}).fail(faults.streamError({ afterChunks: 2, error: { kind: 'overloaded' } }));
+
+    const err = await extractInvoiceStreaming(ai(), 'text').catch((e) => e);
+    expect(err).toBeInstanceOf(ExtractionError);
+    expect(err.message).toMatch(/stopped part-way through the response \(HTTP 503\)/);
+    expect(mock.journal.last()!.fault).toMatchObject({ type: 'stream_error' });
+  });
+});
+
+describe('Vertex AI', () => {
+  it('extracts through a Vertex AI client too (OAuth instead of an API key, project-scoped paths)', async () => {
+    // A static OAuth token: the SDK sends `Authorization: Bearer …` without looking up Google credentials.
+    const authClient = new OAuth2Client();
+    authClient.setCredentials({ access_token: 'test-token', expiry_date: Date.now() + 3_600_000 });
+    const vertex = new GoogleGenAI({ vertexai: true, project: 'my-project', location: 'europe-west4', googleAuthOptions: { authClient }, httpOptions: { baseUrl: mock.urls.gemini } });
+    mock.when({ responseFormat: 'json_schema' }).replyJson(INVOICE);
+
+    const { invoice } = await extractInvoice(vertex, 'Invoice INV-42 from Acme…');
+    expect(invoice).toEqual(INVOICE);
+    expect(mock).toHaveReceivedRequest({ provider: 'gemini', headers: { authorization: 'Bearer test-token' } });
+    expect(mock.journal.last()!.path).toContain('/projects/my-project/locations/europe-west4/publishers/google/models/gemini-2.5-flash:generateContent');
   });
 });

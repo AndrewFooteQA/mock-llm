@@ -124,7 +124,12 @@ function runExample(cwd, exampleDir, specs) {
   const dir = standalone(cwd, exampleDir);
   if (!pinAndInstall(dir, specs)) return { ok: false, failure: `${name}: install failed` };
   const browsers = !depsOf(dir)['@playwright/test'] || sh('npx', ['playwright', 'install', ...(process.env.CI ? ['--with-deps'] : []), 'chromium'], dir);
-  return browsers && sh('npm', ['test'], dir) ? { ok: true, dir } : { ok: false, failure: name };
+  if (!browsers) return { ok: false, failure: name };
+  const code = spawnSync('npm', ['test'], { cwd: dir, stdio: 'inherit', shell: process.platform === 'win32' }).status;
+  // 77 = the example can't run here (e.g. the Claude Code CLI isn't installed). The matrix is about SDK / framework
+  // versions, so that's recorded as a skip, not a failure; CI's `check` job runs that example for real.
+  if (code === 77) console.log(`  ⊘ ${name} skipped`);
+  return code === 0 || code === 77 ? { ok: true, dir } : { ok: false, failure: name };
 }
 
 /** Test-framework targets: every example project that uses the framework, with the framework pinned. */

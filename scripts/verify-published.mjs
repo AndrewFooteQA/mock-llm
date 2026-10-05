@@ -41,10 +41,12 @@ for (const name of examples) {
     installed = run('npm', ['install', '--prefer-online', '--no-audit', '--no-fund', '--loglevel=error'], dir);
     if (!installed && attempt < ATTEMPTS) await sleep(Math.min(attempt * 20_000, 90_000));
   }
-  results.push([name, installed && run('npm', ['test'], dir)]);
+  // 77 = can't run here (e.g. the Claude Code CLI isn't installed): reported as skipped, not failed.
+  const code = installed ? spawnSync('npm', ['test'], { cwd: dir, stdio: 'inherit', shell: process.platform === 'win32' }).status : 1;
+  results.push([name, code === 0 || code === 77, code === 77]);
 }
 rmSync(work, { recursive: true, force: true });
 
 console.log(`\nPublished mock-llm@${version} against the examples:`);
-for (const [name, ok] of results) console.log(`  ${ok ? '✔' : '✘'} ${name}`);
+for (const [name, ok, skipped] of results) console.log(`  ${skipped ? '⊘' : ok ? '✔' : '✘'} ${name}${skipped ? ' (skipped)' : ''}`);
 process.exit(results.every(([, ok]) => ok) ? 0 : 1);

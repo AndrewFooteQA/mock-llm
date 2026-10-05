@@ -21,6 +21,9 @@ Every change ships with:
    tests use the provider's official SDK against the mock.
 2. **Docs.** Update the README section and the playground lesson or Reference page (`playground/public`).
 3. **Examples.** Update or add a project in `examples/` when the change affects how people use the library.
+   `npm run coverage:examples` shows which features the examples use. A new export, fault, matcher or option fails
+   `npm run check` until an example uses it, or until it's exempted in `examples/coverage.json` with a one-line reason
+   (e.g. `"export:myHelper": "internal helper behind mock.env()"`).
 4. **A changeset** when the change ships: anything in `src/`, or a `package.json` field users get (dependencies, peers,
    exports, engines, files). Run `npx changeset`, pick `patch` / `minor`, and describe the change for users. Tests, docs,
    examples, tooling and dev-dependency updates don't need one. CI checks this with `scripts/needs-changeset.mjs`.

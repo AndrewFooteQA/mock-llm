@@ -7,6 +7,7 @@ tested with **Jest** and `mock-llm/jest`. It shows how to:
 - assert with the same matchers as Vitest: `toHaveRequestedTool`, `toHaveReturnedToolResult`, `toHaveToolTrajectory`, `toHaveReceivedRequest(Times)`, `toHaveReceivedPrompt`, `toHaveNoUnmatchedRequests`
 - script multi-tool trajectories and check that conversation memory (`previous_response_id`) reaches the model
 - test refusals and 429 retries
+- **stream** each turn with `responses.stream()` (`ask(question, { onText })`) and check the deltas against `finalResponse()`
 
 ```sh
 npm install

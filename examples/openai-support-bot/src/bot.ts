@@ -7,7 +7,9 @@ export type Answer =
   | { kind: 'refusal'; text: string }
   | { kind: 'truncated'; text: string }
   | { kind: 'unavailable'; text: string }
-  | { kind: 'too_long'; text: string };
+  | { kind: 'too_long'; text: string }
+  | { kind: 'misconfigured'; text: string }
+  | { kind: 'empty'; text: string };
 
 /**
  * A small customer-support bot. The interesting part isn't the happy path. It's
@@ -35,6 +37,10 @@ export class SupportBot {
       if (err instanceof OpenAI.BadRequestError && err.code === 'context_length_exceeded') {
         return { kind: 'too_long', text: 'Your message is too long. Please shorten it and try again.' };
       }
+      // A wrong or missing API key won't fix itself with a retry: say so, so whoever deployed the bot notices.
+      if (err instanceof OpenAI.AuthenticationError) {
+        return { kind: 'misconfigured', text: 'The assistant is not configured correctly (check the API key).' };
+      }
       // Rate limits, outages, timeouts and dropped connections all extend APIError.
       if (err instanceof OpenAI.APIError) {
         return { kind: 'unavailable', text: 'Our assistant is busy right now. Please try again in a moment.' };
@@ -47,6 +53,8 @@ export class SupportBot {
       return { kind: 'refusal', text: "Sorry, I can't help with that. A human agent will follow up." };
     }
     const text = escapeHtml(choice.message.content ?? '');
+    // An empty answer would render as a blank chat bubble: ask the user to rephrase instead.
+    if (!text.trim()) return { kind: 'empty', text: "Sorry, I didn't catch that. Could you rephrase?" };
     if (choice.finish_reason === 'length') return { kind: 'truncated', text: `${text}…` };
     return { kind: 'answer', text };
   }

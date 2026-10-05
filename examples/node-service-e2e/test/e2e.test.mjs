@@ -7,7 +7,7 @@ import { once } from 'node:events';
 import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { stripVTControlCharacters } from 'node:util';
-import { createMockLLM, toHaveReceivedRequest } from 'mock-llm';
+import { builtinScenarios, createMockLLM, ExpectationError, toHaveMetExpectations, toHaveReceivedRequest } from 'mock-llm';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
@@ -24,8 +24,8 @@ async function startService(env) {
   };
 }
 
-const chat = (svc, message) =>
-  fetch(`${svc.url}/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message }) });
+const chat = (svc, message, headers = {}) =>
+  fetch(`${svc.url}/chat`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ message }) });
 
 for (const provider of ['openai', 'anthropic']) {
   describe(`service backed by ${provider}`, () => {
@@ -34,7 +34,9 @@ for (const provider of ['openai', 'anthropic']) {
 
     before(async () => {
       mock = await createMockLLM({ scenarioFiles: ['qa/scenarios.yaml'] });
-      svc = await startService({ ...mock.env(), LLM_PROVIDER: provider });
+      svc = await startService({ ...mock.env(), LLM_PROVIDER: provider, LLM_FORWARD_HEADERS: 'x-request-id, x-mock-scenario', LLM_TIMEOUT_MS: '3000' });
+      // LLM_TIMEOUT_MS: short, so the `timeout` scenario in the sweep below fails fast, but longer than a 429's
+      // retry-after (1 s) plus the retry, so a rate limit still surfaces as a 429 rather than a timeout.
     });
     after(async () => {
       svc?.stop();
@@ -66,6 +68,53 @@ for (const provider of ['openai', 'anthropic']) {
       assert.equal(r.status, 503);
       assert.deepEqual(await r.json(), { error: 'assistant_unavailable' });
       assert.match(stripVTControlCharacters(svc.stderr()), /upstream error: 429/); // console.error colours numbers under FORCE_COLOR
+    });
+
+    it('picks a scenario per request from a forwarded x-mock-scenario header (no code changes)', async () => {
+      // A scenario from the QA file, then a built-in one, for the same question.
+      const vip = await chat(svc, 'Do you sell spaceships?', { 'x-mock-scenario': 'vip', 'x-request-id': 'req-42' });
+      assert.match((await vip.json()).reply, /As a VIP you get free express shipping/);
+      const r = toHaveReceivedRequest(mock, { headers: { 'x-request-id': 'req-42', 'x-mock-scenario': 'vip' } });
+      assert.ok(r.pass, r.message());
+
+      const down = await chat(svc, 'Do you sell spaceships?', { 'x-mock-scenario': 'rate-limit' });
+      assert.equal(down.status, 503);
+    });
+
+    it('routes on a forwarded header in the QA file (beta testers)', async () => {
+      const r = await chat(svc, 'Do you sell spaceships?', { 'x-request-id': 'beta-007' });
+      assert.match((await r.json()).reply, /Thanks for testing the beta/);
+    });
+
+    it('serves the QA file scenarios: echo, filler text and structured JSON', async () => {
+      const echo = await (await chat(svc, 'Ping 123', { 'x-mock-scenario': 'echo' })).json();
+      assert.match(echo.reply, /Ping 123/);
+      const filler = await (await chat(svc, 'Anything', { 'x-mock-scenario': 'filler' })).json();
+      assert.ok(filler.reply.split(/\s+/).length > 10);
+      const structured = await (await chat(svc, 'Anything', { 'x-mock-scenario': 'structured' })).json();
+      assert.deepEqual(JSON.parse(structured.reply), { answer: 'Open daily', confidence: 0.9 });
+    });
+
+    it('survives every built-in scenario: a reply or a clean 503, never a crash', async () => {
+      // A QA sweep: each built-in failure mode or awkward output, picked per request with the forwarded header.
+      for (const name of Object.keys(builtinScenarios)) {
+        const r = await chat(svc, 'Where is my order?', { 'x-mock-scenario': name });
+        assert.ok([200, 503].includes(r.status), `${name}: HTTP ${r.status}`);
+        const body = await r.json();
+        assert.ok(r.status === 200 ? typeof body.reply === 'string' : body.error === 'assistant_unavailable', `${name}: ${JSON.stringify(body)}`);
+      }
+      const r = await chat(svc, 'Still alive?');
+      assert.equal(r.status, 200); // and the service is still up afterwards
+    });
+
+    it('reports an unmet QA expectation as an ExpectationError (and as a plain assertion result)', async () => {
+      mock.when({ lastUserMessage: 'audit' }).reply('ok', { expectRequest: { system: '/a different system prompt/' } });
+      await chat(svc, 'audit');
+      const r = toHaveMetExpectations(mock);
+      assert.equal(r.pass, false);
+      assert.match(r.message(), /expectRequest/);
+      assert.throws(() => mock.assertExpectations(), ExpectationError);
+      mock.journal.clear(); // acknowledged: later tests check expectations again
     });
 
     it('falls back to the default reply', async () => {

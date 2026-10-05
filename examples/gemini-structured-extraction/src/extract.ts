@@ -1,4 +1,4 @@
-import type { GoogleGenAI } from '@google/genai';
+import { ApiError, type GoogleGenAI } from '@google/genai';
 
 export interface Invoice {
   vendor: string;
@@ -61,6 +61,44 @@ export async function extractInvoice(ai: GoogleGenAI, text: string, opts: { mode
     prompt = `${prompt}\n\nYour previous answer was invalid (${lastError}). Return only JSON matching the schema.`;
   }
   throw new ExtractionError(`Could not extract a valid invoice: ${lastError}`);
+}
+
+/**
+ * Streamed extraction for long documents: report progress as JSON arrives, then validate the whole object.
+ * A stream that fails part-way is reported to the caller, not silently treated as a short answer.
+ */
+export async function extractInvoiceStreaming(
+  ai: GoogleGenAI,
+  text: string,
+  opts: { model?: string; onProgress?: (receivedChars: number) => void } = {},
+): Promise<Invoice> {
+  const { model = 'gemini-2.5-flash', onProgress } = opts;
+  let json = '';
+  try {
+    const stream = await ai.models.generateContentStream({
+      model,
+      contents: `Extract the invoice from this text:\n\n${text}`,
+      config: { responseMimeType: 'application/json', responseJsonSchema: INVOICE_SCHEMA },
+    });
+    for await (const chunk of stream) {
+      json += chunk.text ?? '';
+      onProgress?.(json.length);
+    }
+  } catch (err) {
+    if (err instanceof ApiError) {
+      throw new ExtractionError(`The model stopped part-way through the response (HTTP ${err.status}); ${json.length} characters received. Try again.`);
+    }
+    throw err;
+  }
+  let value: unknown;
+  try {
+    value = parseLenient(json);
+  } catch {
+    throw new ExtractionError('Streamed response was not valid JSON');
+  }
+  const problems = validateInvoice(value);
+  if (problems.length) throw new ExtractionError(`Streamed invoice is invalid: ${problems.join('; ')}`);
+  return value as Invoice;
 }
 
 /** Parse JSON, tolerating a ```json fence and surrounding chatter. */

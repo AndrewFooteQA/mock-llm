@@ -848,6 +848,7 @@ async function renderReference() {
       ${row('replyEcho · replyLorem · replyJson', 'Echo the last user message · seeded filler · JSON text')}
       ${row('replyToolCall · replyToolCalls', 'One or parallel tool calls; a string input simulates malformed args')}
       ${row('replyFromSchema({ violate })', 'JSON generated from the request schema; <code>violate</code> breaks it (always invalid: drops a required field, else a wrong type)')}
+      ${row('fakeFromSchema(schema, { seed, violate })', 'The same generator, exported for your own fixtures (e.g. to unit-test a validator). Deterministic per seed (default 1)')}
       ${row('replyToolCallFromSchema(name)', 'Tool args generated from the tool schema')}
       ${row('fail(fault)', 'Any fault below')}
       ${row('inject(text, { position })', 'Add text to every reply from this rule')}
@@ -905,14 +906,15 @@ async function renderReference() {
     <h2 id="Examples">Example projects</h2>
     <p>Standalone starter projects live in <code>examples/</code> in the repo. Each one pairs real app code with tests against mock-llm. Copy one to get started.</p>
     <table class="grid"><tbody>
-      ${row('openai-support-bot', 'OpenAI Chat + Vitest: refusals, truncation, output escaping, retries, outages, timeouts, context window, seeded chaos (errors + content); <b>strict mode</b>; request / prompt / token matchers')}
-      ${row('claude-tool-agent', 'Claude + Vitest: tool-use loops, parallel calls, hallucinated tools, runaway loops; <b>tool trajectory / tool result matchers</b>; model-glob + tools rules')}
-      ${row('gemini-structured-extraction', 'Gemini + Vitest: JSON schema output, schema violations, repair-and-retry; request / prompt matchers')}
-      ${row('bedrock-streaming-summarizer', 'Bedrock + Vitest: ConverseStream, mid-stream cuts, throttling, latency (incl. per-rule seeded random); <b>events</b> (<code>mock.on(\'chunk\')</code>); request matcher')}
-      ${row('node-service-e2e', 'OpenAI & Claude + node:test: child-process service via mock.env(), YAML QA scenarios with expectation steps; assertions as plain functions')}
-      ${row('jest-travel-assistant', 'OpenAI Responses API + <b>Jest</b> (ESM): mock-llm/jest, strict mode, tool loop via previous_response_id, conversation memory, matchers')}
+      ${row('openai-support-bot', 'OpenAI Chat + Vitest: every fault (incl. <code>raw</code>, connection reset + 500 retries counted from the journal, <code>apiKeys</code> → 401), refusals, empty / truncated / long / unicode output, escaping + <code>inject</code>, context window, seeded chaos; <b>strict mode</b> + <code>unmatched</code> event; a <b>shared YAML baseline</b> (<code>scenarioFiles</code>) across tests; an expectation step + strict mode failing for the checked reason; request / prompt / token matchers')}
+      ${row('claude-tool-agent', 'Claude + Vitest: tool loops (parallel, hallucinated, malformed, schema-generated input), runaway loops, <b>messages.stream()</b> incl. a streamed tool turn, <code>{ thinking }</code> logged not shown; routing on system / turn / tools / stream / any message / <code>where</code>; tool matchers incl. <code>toHaveOfferedTool</code>')}
+      ${row('gemini-structured-extraction', 'Gemini + Vitest: JSON schema output, violations, repair-and-retry, <b>generateContentStream</b> + a mid-stream error, <b>Vertex AI</b> client, <code>fakeFromSchema</code> fixtures; request / prompt matchers')}
+      ${row('bedrock-streaming-summarizer', 'Bedrock + Vitest: ConverseStream, Converse, InvokeModel and InvokeModelWithResponseStream (Claude body), max_tokens truncation, cuts, throttling, per-step and per-rule latency; <b>events</b> incl. <code>fault</code>; the <code>wire</code> record')}
+      ${row('node-service-e2e', 'OpenAI & Claude + node:test: child-process service via mock.env(), YAML QA scenarios (expectation steps, header routing, echo / lorem / json), forwarded <code>x-mock-scenario</code>, a sweep of every built-in scenario; assertions as plain functions, <code>ExpectationError</code>')}
+      ${row('jest-travel-assistant', 'OpenAI Responses API + <b>Jest</b> (ESM): mock-llm/jest, strict mode, tool loop via previous_response_id, <b>responses.stream()</b>, conversation memory, matchers')}
       ${row('playwright-chat-ui', '<b>Playwright</b> full-stack: shared mock via globalSetup, llm.load scripting, routeBrowser, real-provider guard, strict mode, async matchers, mid-stream UI via exact chunks')}
-      ${row('claude-code-cli', 'Run the real Claude Code CLI against the mock')}
+      ${row('rag-knowledge-base', 'Embeddings (OpenAI base64 + float, Gemini AI Studio + Vertex <code>:predict</code>, Bedrock Titan), token counting (Anthropic, Gemini, Bedrock), <code>models.list</code> + the <code>models</code> option, prompt and <b>cost</b> assertions with custom <code>pricing</code>')}
+      ${row('claude-code-cli', 'Run the real Claude Code CLI against the mock and assert on what it sent (skips with exit 77 without the CLI; CI installs it)')}
     </tbody></table>
 
     <h2 id="Endpoints">Base URLs & endpoints</h2>

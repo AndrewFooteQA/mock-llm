@@ -1,0 +1,17 @@
+# Shared baseline for test/baseline.test.ts, loaded with useMockLLM({ scenarioFiles }).
+# mock-llm re-applies it fresh before every test: sequences start over and `once` rules can fire again.
+rules:
+  - name: opening-hours
+    when: { lastUserMessage: "/opening hours/i" }
+    reply: We're open 9:00–17:00, Monday to Friday.
+  - name: order-status
+    when: { lastUserMessage: "/where is my order/i" }
+    steps:
+      - reply: Let me check that for you.
+      - reply: It shipped yesterday and arrives tomorrow.
+  - name: refund-outage
+    when: { lastUserMessage: "/refund/i" }
+    once: true
+    fail: { overloaded: {} }
+default:
+  reply: I can help with orders, refunds and opening hours.

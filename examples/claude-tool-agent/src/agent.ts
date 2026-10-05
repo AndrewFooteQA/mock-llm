@@ -9,27 +9,46 @@ export interface AgentResult {
   toolCalls: Array<{ name: string; input: unknown; ok: boolean }>;
 }
 
+export interface AgentOptions {
+  model?: string;
+  maxTurns?: number;
+  tools?: Record<string, Tool>;
+  /** Stream each turn with `messages.stream()`; `onText` receives the answer's text as it arrives. */
+  stream?: boolean;
+  onText?: (delta: string) => void;
+  /** Diagnostics, e.g. the model's reasoning. It is never part of the answer shown to users. */
+  log?: (line: string) => void;
+}
+
 /**
  * A minimal manual tool-use loop: call Claude, run any requested tools, send
  * every result back in ONE user message, repeat until Claude stops asking.
  */
-export async function runAgent(
-  client: Anthropic,
-  question: string,
-  opts: { model?: string; maxTurns?: number; tools?: Record<string, Tool> } = {},
-): Promise<AgentResult> {
-  const { model = 'claude-opus-5-5', maxTurns = 5, tools = defaultTools } = opts;
+export async function runAgent(client: Anthropic, question: string, opts: AgentOptions = {}): Promise<AgentResult> {
+  const { model = 'claude-opus-5-5', maxTurns = 5, tools = defaultTools, stream = false, onText, log } = opts;
   const messages: Anthropic.MessageParam[] = [{ role: 'user', content: question }];
   const toolCalls: AgentResult['toolCalls'] = [];
 
   for (let turn = 1; turn <= maxTurns; turn++) {
-    const message = await client.messages.create({
+    const params: Anthropic.MessageCreateParamsNonStreaming = {
       model,
       max_tokens: 4096,
+      thinking: { type: 'adaptive' },
       system: 'You are a helpful shopping assistant. Use tools when needed.',
       tools: Object.values(tools).map((t) => t.definition),
       messages,
-    });
+    };
+    let message: Anthropic.Message;
+    if (stream) {
+      const s = client.messages.stream(params);
+      if (onText) s.on('text', onText);
+      message = await s.finalMessage();
+    } else {
+      message = await client.messages.create(params);
+    }
+
+    // Reasoning is useful for debugging, but it isn't the answer: log it, never show it.
+    for (const block of message.content) if (block.type === 'thinking') log?.(`thinking: ${block.thinking}`);
 
     if (message.stop_reason === 'refusal') throw new AgentError('The model declined this request.');
     if (message.stop_reason !== 'tool_use') {

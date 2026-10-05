@@ -7,9 +7,15 @@ It shows how to:
 
 - use `mock.env()` (`OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, dummy keys) to redirect an unmodified app
 - keep QA behaviour in a **YAML scenario file** (`qa/scenarios.yaml`) that non-developers can edit, including **expectation steps** (`expectRequest`) checked with `mock.assertExpectations()`
-- trigger failures with **no code changes**, using a `[[mock:rate-limit]]` token in user input
+- trigger failures with **no code changes**, using a `[[mock:rate-limit]]` token in user input, or an `x-mock-scenario`
+  header the service forwards to its LLM call (`LLM_FORWARD_HEADERS`, the same mechanism as tracing headers)
+- sweep **every built-in scenario** through the running service: each must give a reply or a clean 503, never a crash
+  (this found that the service needed an LLM timeout: `LLM_TIMEOUT_MS`)
+- route on a forwarded header in the QA file, and use `echo`, `lorem` and `json` scenarios there
 - run the same suite against **two providers**
-- assert on what the service sent with mock-llm's framework-agnostic assertion functions (`toHaveReceivedRequest(mock, …)` returns `{ pass, message }`), or via `mock.journal` / `GET /__mock/journal`
+- assert on what the service sent with mock-llm's framework-agnostic assertion functions (`toHaveReceivedRequest(mock, …)`
+  and `toHaveMetExpectations(mock)` return `{ pass, message }`; `mock.assertExpectations()` throws an `ExpectationError`),
+  or via `mock.journal` / `GET /__mock/journal`
 
 ```sh
 npm install

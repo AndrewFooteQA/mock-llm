@@ -3,13 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "tsc --noEmit && vitest run"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "mock-llm": "file:../..",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }
 }

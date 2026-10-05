@@ -78,3 +78,14 @@ describe('fakeFromSchema({ violate: true }) always breaks the schema', () => {
     expect((fakeFromSchema({ type: 'object', properties: props, required: ['b'] }, new Rng(1), { violate: true }) as any).b).toBe(12345);
   });
 });
+
+describe('fakeFromSchema public API (regression: it required an Rng, which the package does not export)', () => {
+  const schema = { type: 'object', properties: { id: { type: 'string' }, n: { type: 'integer', minimum: 1, maximum: 9 } }, required: ['id', 'n'] };
+  it('works with just a schema, or with { seed, violate }', () => {
+    expect(fakeFromSchema(schema)).toEqual(fakeFromSchema(schema, { seed: 1 })); // default seed 1
+    expect(fakeFromSchema(schema, { seed: 5 })).toEqual(fakeFromSchema(schema, new Rng(5))); // same stream as an Rng
+    expect(fakeFromSchema(schema, { seed: 5 })).toMatchObject({ id: expect.any(String), n: expect.any(Number) });
+    const bad = fakeFromSchema(schema, { seed: 5, violate: true }) as Record<string, unknown>;
+    expect(typeof bad.id !== 'string' || typeof bad.n !== 'number' || !('id' in bad) || !('n' in bad)).toBe(true);
+  });
+});

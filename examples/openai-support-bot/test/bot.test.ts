@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { createMockLLM, edge, faults } from 'mock-llm';
+import { createMockLLM, edge, faults, UnmatchedRequestError, type JournalEntry } from 'mock-llm';
 import { useMockLLM } from 'mock-llm/vitest';
 import { describe, expect, it } from 'vitest';
 import { SupportBot, SYSTEM_PROMPT } from '../src/bot.js';
@@ -53,6 +53,43 @@ describe('SupportBot', () => {
     expect(mock).toHaveReceivedRequestTimes(2);
   });
 
+  it('retries a dropped connection and a 500, then answers (SDK retries, counted from the journal)', async () => {
+    mock.when({}).reply('Back online.');
+    mock.when({}).once().fail(faults.serverError());
+    mock.when({}).once().fail(faults.connectionReset()); // latest rule wins: reset first, then the 500, then the reply
+
+    expect(await bot({ maxRetries: 2 }).answer('hello')).toEqual({ kind: 'answer', text: 'Back online.' });
+    // Three requests reached the mock: the reset socket (no response), the 500, then the reply.
+    expect(mock.journal.all().map((e) => (e.fault?.type === 'connection_reset' ? 'reset' : e.status))).toEqual(['reset', 500, 200]);
+  });
+
+  it('degrades gracefully when retries run out on a dropped connection', async () => {
+    mock.when({}).fail(faults.connectionReset());
+    expect((await bot({ maxRetries: 1 }).answer('hello')).kind).toBe('unavailable');
+    expect(mock).toHaveReceivedRequestTimes(2); // the first attempt plus one retry
+  });
+
+  it('reports a wrong API key as a configuration problem, not an outage', async () => {
+    // A separate mock that enforces API keys: anything but 'sk-right' gets OpenAI's native 401.
+    const keyed = await createMockLLM({ apiKeys: ['sk-right'] });
+    try {
+      keyed.default().reply('hi');
+      const wrong = new SupportBot(new OpenAI({ baseURL: keyed.urls.openai, apiKey: 'sk-wrong', maxRetries: 2 }));
+      expect(await wrong.answer('hello')).toEqual({ kind: 'misconfigured', text: 'The assistant is not configured correctly (check the API key).' });
+      expect(keyed.journal.all().map((e) => e.status)).toEqual([401]); // the SDK doesn't retry a 401
+      const right = new SupportBot(new OpenAI({ baseURL: keyed.urls.openai, apiKey: 'sk-right', maxRetries: 0 }));
+      expect((await right.answer('hello')).kind).toBe('answer');
+    } finally {
+      await keyed.stop();
+    }
+  });
+
+  it('asks the user to shorten the question on a scripted context-length error', async () => {
+    // The fault directly, for any prompt (separate from the contextWindow option, which measures the prompt).
+    mock.when({}).fail(faults.contextLengthExceeded({ details: { limit: 8192, inputTokens: 9001 } }));
+    expect((await bot().answer('a short question')).kind).toBe('too_long');
+  });
+
   it('degrades gracefully during an outage', async () => {
     mock.when({}).fail(faults.overloaded());
     expect((await bot().answer('hello')).kind).toBe('unavailable');
@@ -65,13 +102,18 @@ describe('SupportBot', () => {
 
   it('strict mode catches an unscripted question the bot would hide', async () => {
     mock.when(/refund/i).reply('Refunds take 5 business days.');
+    // The `unmatched` event fires as it happens, e.g. to log questions nobody scripted yet.
+    const unscripted: string[] = [];
+    mock.on('unmatched', ({ entry }) => unscripted.push(entry.request.messages.at(-1)!.content.map((p) => (p.type === 'text' ? p.text : '')).join('')));
 
     // No rule for this: the bot swallows the 400 and the user just sees "busy"…
     expect((await bot().answer('Where is my order?')).kind).toBe('unavailable');
 
     // …but the mock knows, and would fail this test in afterEach. Here we assert it explicitly:
     expect(mock).not.toHaveNoUnmatchedRequests();
+    expect(() => mock.assertNoUnmatched()).toThrow(UnmatchedRequestError);
     expect(() => mock.assertNoUnmatched()).toThrow(/UNEXPECTED LLM REQUEST[\s\S]*lastUserMessage: "Where is my order\?"/);
+    expect(unscripted).toEqual(['Where is my order?']);
     mock.journal.clear(); // acknowledged, so strict mode doesn't fail this demo test
   });
 
@@ -110,7 +152,7 @@ describe('SupportBot', () => {
       for (let i = 0; i < 20; i++) kinds.add((await chaosBot.answer('How do refunds work?')).kind);
 
       const replay = `replay with MOCK_LLM_SEED=${chaotic.seed}`;
-      expect([...kinds].sort(), replay).toEqual(['answer', 'refusal', 'truncated']); // each handled, never thrown
+      expect([...kinds].sort(), replay).toEqual(['answer', 'empty', 'refusal', 'truncated']); // each handled, never thrown
       // The journal says exactly what chaos did:
       expect(new Set(chaotic.journal.all().map((e) => e.chaos?.behaviour ?? 'none')), replay).toEqual(new Set(['none', 'refusal', 'empty', 'truncated']));
     } finally {
@@ -122,5 +164,78 @@ describe('SupportBot', () => {
     mock.when({}).replyLorem({ tokens: 120 });
     await bot().answer('Tell me about your store');
     expect(mock).toHaveUsedTokensLessThan(100, { kind: 'input' });
+  });
+
+  it('budgets on the usage the API reports (scripted usage)', async () => {
+    mock.when({}).reply('Short answer.', { usage: { inputTokens: 1200, outputTokens: 40 } });
+    await bot().answer('hi');
+    const entry: JournalEntry = mock.journal.last()!;
+    expect(entry.usage).toMatchObject({ inputTokens: 1200, outputTokens: 40 });
+    expect(mock).not.toHaveUsedTokensLessThan(1000, { kind: 'input' });
+  });
+
+  // Every other API error degrades to "busy" (a wrong key is the exception: see above).
+  it.each([
+    ['400 bad request', faults.badRequest()],
+    ['403 permission denied', faults.permissionDenied()],
+    ['404 model not found', faults.notFound()],
+    ['413 request too large', faults.requestTooLarge()],
+    ["a proxy's HTML 502 page", faults.raw(502, '<html><body>Bad Gateway</body></html>', { 'content-type': 'text/html' })],
+  ])('degrades gracefully on %s', async (_what, fault) => {
+    mock.when({}).fail(fault);
+    expect((await bot().answer('hello')).kind).toBe('unavailable');
+  });
+
+  it('reports a scripted 401 (authError) like a wrong API key', async () => {
+    mock.when({}).fail(faults.authError());
+    expect((await bot().answer('hello')).kind).toBe('misconfigured');
+  });
+
+  it('retries two 429s in a row (a rule limited with times(2))', async () => {
+    mock.when({}).reply('Third time lucky.');
+    mock.when({}).times(2).fail(faults.rateLimit({ retryAfter: 0.01 }));
+    expect((await bot({ maxRetries: 2 }).answer('hello')).text).toBe('Third time lucky.');
+    expect(mock.journal.all().map((e) => e.status)).toEqual([429, 429, 200]);
+  });
+
+  it('asks the user to rephrase instead of showing an empty answer', async () => {
+    mock.when({}).reply(edge.empty());
+    expect(await bot().answer('hello')).toEqual({ kind: 'empty', text: "Sorry, I didn't catch that. Could you rephrase?" });
+  });
+
+  it('keeps emoji, accents and right-to-left text intact while escaping', async () => {
+    mock.when({}).reply(edge.unicode());
+    const { text } = await bot().answer('hello');
+    expect(text.length).toBeGreaterThan(0);
+    expect(text).toMatch(/\p{Extended_Pictographic}/u);
+    expect(text).not.toMatch(/\uFFFD/); // no mangled characters
+  });
+
+  it('returns a very long answer in full', async () => {
+    mock.when({}).reply(edge.long(3000));
+    const { kind, text } = await bot().answer('Tell me everything');
+    expect(kind).toBe('answer');
+    expect(text.length).toBeGreaterThan(5000);
+  });
+
+  it('escapes text appended to the reply (inject), e.g. markup a model echoes back', async () => {
+    mock.when({}).reply('Your order shipped.').inject(' <img src=x onerror=alert(1)>');
+    expect((await bot().answer('hi')).text).toBe('Your order shipped. &lt;img src=x onerror=alert(1)&gt;');
+  });
+
+  it('echo wiring check: the question reaches the model unchanged', async () => {
+    mock.when({}).replyEcho();
+    expect((await bot().answer('Is the café open on Sundays?')).text).toContain('Is the café open on Sundays?');
+  });
+
+  it("with onUnmatched: 'error', an unscripted question gets a native error instead of a canned reply", async () => {
+    const m = await createMockLLM({ onUnmatched: 'error' });
+    try {
+      const b = new SupportBot(new OpenAI({ baseURL: m.urls.openai, apiKey: 'test', maxRetries: 0 }));
+      expect((await b.answer('anything')).kind).toBe('unavailable');
+      expect(m.journal.last()!.unmatched).toBe(true);
+    } finally {
+      await m.stop();
+    }
   });
 });
