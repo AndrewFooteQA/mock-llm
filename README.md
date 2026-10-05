@@ -499,7 +499,10 @@ isolation, so parallel workers can share one mock, is not supported yet (roadmap
 
 ## Asserting on what your app sent
 
-Importing `mock-llm/vitest` registers matchers that check what your app *sent* to the model, across every provider:
+Importing `mock-llm/vitest` registers matchers that check what your app *sent* to the model, across every provider.
+Their TypeScript types work on Vitest 4 and 5. On Vitest 4, keep `skipLibCheck: true` (the default in `tsc --init` and the
+Vite / Vitest templates): Vitest 4 and 5 declare the matcher interface differently, so one of the two declarations
+mock-llm ships always mismatches when library files are checked.
 
 ```ts
 import { useMockLLM } from 'mock-llm/vitest';

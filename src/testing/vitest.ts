@@ -37,7 +37,17 @@ expect.extend(llmMatchers);
 
 export { llmMatchers, type MockLLMMatchers };
 
+// Vitest 5: \`expect(x)\` returns Assertion<R, T>, which extends vitest's Matchers<R, T>.
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface Matchers<R, T> extends MockLLMMatchers<R> {}
+}
+// Vitest 4: its Matchers<T> has one type parameter (so the declaration above can't merge with it), but Assertion<T>
+// extends the global jest.Matchers<void, T>. Augmenting that gives Vitest 4 users the matcher types too.
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace jest {
+    // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+    interface Matchers<R, T = {}> extends MockLLMMatchers<R> {}
+  }
 }
