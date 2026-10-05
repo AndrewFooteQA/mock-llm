@@ -99,17 +99,18 @@ function prettyMaybeJson(text) {
 const meta = getMeta;
 
 /**
- * "Run it live": open the repo in StackBlitz at the released tag, starting the real playground (Node in the browser).
- * The static build puts the version on <html data-version>.
+ * The hosted (static) site can only replay recorded runs; running your own input needs the playground locally.
+ * (In-browser Node such as StackBlitz can build it, but can't serve the mock's HTTP/1.1 + HTTP/2 single-port server:
+ * see ROADMAP R20.) The static build puts the release version on <html data-version>, so the link opens that tag.
  */
 const REPO = 'AndrewFooteQA/mock-llm';
-const liveUrl = () => {
+const repoUrl = () => {
   const v = document.documentElement.dataset.version;
-  return `https://stackblitz.com/github/${REPO}/tree/${v ? `v${v}` : 'main'}?startScript=playground&file=playground%2Fpublic%2Flessons.js`;
+  return `https://github.com/${REPO}${v ? `/tree/v${v}` : ''}`;
 };
 const liveNote = (what) =>
   isStatic
-    ? `<div class="static-note">${what} The hosted site replays recorded runs. To run your own input, <a class="btn" href="${liveUrl()}" target="_blank" rel="noopener">Run it live ↗</a> (StackBlitz, about a minute to boot) or run it locally: <code>git clone https://github.com/${REPO} &amp;&amp; cd mock-llm &amp;&amp; npm install &amp;&amp; npm run playground</code></div>`
+    ? `<div class="static-note">${what} The hosted site replays runs recorded against the real SDKs. To run your own input, <a class="btn" href="${repoUrl()}" target="_blank" rel="noopener">Run it locally ↗</a> <code>git clone https://github.com/${REPO} &amp;&amp; cd mock-llm &amp;&amp; npm install &amp;&amp; npm run playground</code></div>`
     : '';
 
 // ------------------------------------------------------------------ router
@@ -796,7 +797,7 @@ async function renderReference() {
     <div class="tags">${['Assertions on app output', 'Semantic / LLM-as-judge assertions', '"Handles gracefully" assertions', 'Running suites & CLI seeds', 'Test reports', 'Production capture & OTel exporters', 'Runtime setProvider()'].map((t) => `<code>${esc(t)}</code>`).join('')}</div>
 
     <h2 id="Online">Where to find this online</h2>
-    <p>This site is hosted at <a href="https://andrewfooteqa.github.io/mock-llm/" target="_blank" rel="noopener">andrewfooteqa.github.io/mock-llm</a> and rebuilt for each npm release. There, lessons replay runs recorded against the real SDKs, and <b>Run it live</b> opens the real playground in StackBlitz. Locally, <code>npm run playground</code> runs everything live. Source: <a href="https://github.com/AndrewFooteQA/mock-llm" target="_blank" rel="noopener">github.com/AndrewFooteQA/mock-llm</a> · package: <a href="https://www.npmjs.com/package/mock-llm" target="_blank" rel="noopener">npmjs.com/package/mock-llm</a>.</p>
+    <p>This site is hosted at <a href="https://andrewfooteqa.github.io/mock-llm/" target="_blank" rel="noopener">andrewfooteqa.github.io/mock-llm</a> and rebuilt for each npm release. There, lessons replay runs recorded against the real SDKs. Locally, <code>npm run playground</code> runs everything live, including your own input. Source: <a href="https://github.com/AndrewFooteQA/mock-llm" target="_blank" rel="noopener">github.com/AndrewFooteQA/mock-llm</a> · package: <a href="https://www.npmjs.com/package/mock-llm" target="_blank" rel="noopener">npmjs.com/package/mock-llm</a>.</p>
 
     <h2 id="Install">Install & set up</h2>
     <div data-slot="install"></div>

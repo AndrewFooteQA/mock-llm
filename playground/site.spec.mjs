@@ -47,11 +47,12 @@ test('switching provider and variant replays the matching recording', async ({ p
   expect(problems).toEqual([]);
 });
 
-test('the Playground page replays its default run per provider, read-only, with "Run it live"', async ({ page }) => {
+test('the Playground page replays its default run per provider, read-only, with "Run it locally"', async ({ page }) => {
   const problems = guard(page);
   await page.goto('#/playground');
   await expect(page.locator('textarea[name=rules]')).toBeDisabled();
-  await expect(page.getByRole('link', { name: /Run it live/ })).toHaveAttribute('href', /^https:\/\/stackblitz\.com\/github\/AndrewFooteQA\/mock-llm\/tree\/v\d/);
+  await expect(page.getByRole('link', { name: /Run it locally/ })).toHaveAttribute('href', /^https:\/\/github\.com\/AndrewFooteQA\/mock-llm\/tree\/v\d/);
+  await expect(page.locator('.static-note code')).toContainText('npm run playground');
   for (const { id } of PROVIDERS) {
     await page.locator('select[name=provider]').selectOption(id);
     await runAndWait(page);
@@ -73,7 +74,7 @@ test('an edited scenario explains it is not recorded instead of failing silently
   const editable = LESSONS.find((l) => l.editable);
   await page.goto(`#/lesson/${editable.id}`);
   await expect(page.locator('textarea.editor')).toHaveAttribute('readonly', '');
-  await expect(page.getByRole('link', { name: /Run it live/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Run it locally/ })).toBeVisible();
 });
 
 test('screenshot of a lesson run, published with the site (the README shows it from the Pages URL)', async ({ page }) => {

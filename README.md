@@ -672,8 +672,7 @@ The full feature list per example is in [`examples/README.md`](examples/README.m
 ## Docs & live playground
 
 **Hosted:** [https://andrewfooteqa.github.io/mock-llm/](https://andrewfooteqa.github.io/mock-llm/), rebuilt for each npm release so it documents the version you install. It replays
-runs recorded against the real SDKs, and its "Run it live" button opens the real playground in StackBlitz. To run
-your own input locally:
+runs recorded against the real SDKs. To run your own input, run the playground locally:
 
 ```sh
 npm run playground   # → http://localhost:4317
