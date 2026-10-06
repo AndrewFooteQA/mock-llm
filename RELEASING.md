@@ -16,7 +16,11 @@ run that built it.
    - `changeset publish`, which publishes to npm with provenance and then `changesets/action` pushes the `vX.Y.Z` git tag and creates the GitHub Release;
    - `npm run verify:published`, which installs the version just published from npm into a copy of every example and
      runs its tests;
-   - then it dispatches the **Pages** workflow for the new tag. That workflow rebuilds the hosted docs site
+   - these last two steps run whenever this run **published**, judged by npm itself
+     (`scripts/release-state.mjs`: the version was absent before the publish step and present after it). They still
+     run if the changesets step fails after publishing, e.g. on a GitHub API timeout creating the GitHub Release, as
+     with 0.2.2;
+   - then it dispatches the **Pages** workflow for the published commit. That workflow rebuilds the hosted docs site
      (https://andrewfooteqa.github.io/mock-llm/) from the tag, smoke-tests it, and deploys it. It's a separate run, so a failed docs deploy
      never marks the npm release as failed. Redeploy by hand from Actions → Pages → Run workflow (the input takes a
      tag or branch; empty means the latest `v*` tag).

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag (or branch) to build, e.g. v0.3.0; empty = the latest v* tag'
+        description: 'Tag, branch or commit to build, e.g. v0.3.0; empty = the latest v* tag'
         required: false
 
 permissions:
