@@ -795,7 +795,7 @@ for every provider), and make gaps visible with a script so coverage can't slip 
   `--prefer-online` fix, which was deferred from R16 and is now proven in CI.
 
 ### R20. Hosted playground on GitHub Pages
-**Status:** Ready for sign-off (2026-10-05)
+**Status:** Signed off: 2026-10-05
 **Depends on:** none (waits for the item in progress)
 **Goal:** anyone can browse the tutorial, see real runs and read the Reference at
 https://andrewfooteqa.github.io/mock-llm/, linked from the README and npm, with nothing to host or operate.
@@ -920,6 +920,22 @@ domain; versioned docs per release (only the latest release is published).
   as "Success". It now shows "The run ended unexpectedly".
 
 ---
+
+### R21. Gemini continuation tokens (resumable generation)
+**Status:** Proposed (from the SDK update playbook, Renovate PR #8: `@google/genai` 2.26.0)
+**Depends on:** none
+**Goal:** apps that resume long Gemini generations can test that path: the model stops with
+`finishReason: CONTINUATION` and an opaque `continuationToken`, and the app sends `config.continuationToken` to continue.
+
+**Draft acceptance criteria** (to be agreed before work starts)
+- [ ] A reply can end in continuation: e.g. `reply(text, { stopReason: 'continuation' })`, the IR stop reason maps to
+      Gemini's `CONTINUATION` with a deterministic base64 `continuationToken` (seeded), streaming and non-streaming
+- [ ] A matcher for resume requests (e.g. `when({ continuationToken: true | string })`), plus YAML support
+- [ ] Other providers: documented as Gemini-only (no equivalent wire field), so the stop reason falls back to `max_tokens` there
+- [ ] Contract tests through `@google/genai` ≥ 2.26.0, gated with `sdkAtLeast` for the matrix floor
+- [ ] Standard criteria: README + playground lesson variant + an example use (the coverage gate will require one)
+
+**Amendments:** none
 
 ## Phase V2: Serious AI QA
 
