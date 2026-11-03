@@ -55,6 +55,7 @@ unchanged against Anthropic (`stop_reason: "max_tokens"`), the Responses API (`s
 | makes an LLM call nobody planned, then swallows the error | strict mode: the test fails and prints the request, with a ready-made `mock.when(…)` | [Strict mode](docs/assertions.md#strict-mode) |
 | sends the wrong system prompt or model, or costs too much | `toHaveReceivedRequest({ … })`, `toCostLessThan(0.05)` | [Matchers](docs/assertions.md#asserting-on-what-your-app-sent) |
 | falls over when the prompt outgrows the context window | `contextWindow: { 'gpt-4o': 128_000 }` gives the native error | [Context window](docs/failures.md#context-window) |
+| breaks when a model is retired, or rejects a thinking setting | `models: [{ id, lifecycle: 'retired' }]`, `capabilities` per model (Claude API 2026-10-21) | [Model errors](docs/failures.md#model-lifecycle-and-thinking-errors-claude) |
 | fails only sometimes | seeded `chaos: { rate: 0.1 }`, replayed exactly with `MOCK_LLM_SEED` | [Chaos](docs/failures.md#chaos-errors-and-bad-content) |
 
 **[Docs & live playground →](https://andrewfooteqa.github.io/mock-llm/)** Step-by-step lessons with real SDK runs, a free-form playground and the API reference.
@@ -125,7 +126,7 @@ service, a CLI or Claude Code itself. Jest's ESM setup, Playwright and every opt
 | [Scripting responses](docs/scripting.md) | [Matchers and precedence](docs/scripting.md#scripting-responses), [tool loops](docs/scripting.md#agent--tool-loops), [exact stream chunks](docs/scripting.md#exact-stream-chunks), [latency](docs/scripting.md#latency), [YAML scenario files](docs/scripting.md#scenario-files-yaml--json), [per-request scenarios](docs/scripting.md#per-request-scenarios-no-code-changes), [provider notes](docs/scripting.md#provider-specific-notes) |
 | [Failures](docs/failures.md) | [Faults](docs/failures.md#faults-negative-testing), [chaos](docs/failures.md#chaos-errors-and-bad-content), [reproducing a run](docs/failures.md#reproducing-a-run-mock_llm_seed), [context window](docs/failures.md#context-window), [awkward outputs](docs/failures.md#awkward-outputs-edge-cases) |
 | [Assertions](docs/assertions.md) | [Matchers](docs/assertions.md#asserting-on-what-your-app-sent), [strict mode](docs/assertions.md#strict-mode), [the journal](docs/assertions.md#assertions-the-journal), [events](docs/assertions.md#events), [simulated cost](docs/assertions.md#simulated-cost) |
-| [Live playground](https://andrewfooteqa.github.io/mock-llm/) | 17 runnable lessons, a free-form scenario editor and the API reference, replaying runs recorded against the real SDKs, rebuilt for every release. Run it locally with `npm run playground` (http://localhost:4317) to try your own input. |
+| [Live playground](https://andrewfooteqa.github.io/mock-llm/) | 18 runnable lessons, a free-form scenario editor and the API reference, replaying runs recorded against the real SDKs, rebuilt for every release. Run it locally with `npm run playground` (http://localhost:4317) to try your own input. |
 
 ## Supported APIs
 
@@ -194,7 +195,7 @@ Run them all with `npm run test:examples`. `npm run coverage:examples` reports w
 | Example | Also shows |
 |---|---|
 | [`openai-support-bot`](examples/openai-support-bot) | Every fault, retries counted from the journal, awkward outputs, strict mode, a shared YAML baseline across tests, an expectation step failing for the checked reason, chaos |
-| [`claude-tool-agent`](examples/claude-tool-agent) | `messages.stream()` incl. streamed tool turns, `{ thinking }`, tool matchers, routing on conversation shape |
+| [`claude-tool-agent`](examples/claude-tool-agent) | `messages.stream()` incl. streamed tool turns, `{ thinking }`, tool matchers, routing on conversation shape, quick mode (`speed` matcher, `between_tools` progress updates, model `capabilities` / `lifecycle` via `models`) |
 | [`gemini-structured-extraction`](examples/gemini-structured-extraction) | Schema output and violations, `generateContentStream` + mid-stream error, Vertex AI, `fakeFromSchema` |
 | [`bedrock-streaming-summarizer`](examples/bedrock-streaming-summarizer) | Converse / ConverseStream / InvokeModel (+ stream), events incl. `fault`, the `wire` record, latency |
 | [`node-service-e2e`](examples/node-service-e2e) | `node:test`, `mock.env()`, YAML QA scenarios, forwarded `x-mock-scenario`, a sweep of every built-in scenario |

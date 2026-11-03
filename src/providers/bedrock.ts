@@ -2,7 +2,7 @@ import { embedding } from '../core/rng.js';
 import { approxTokens, chunkText, textPieces } from '../core/tokens.js';
 import type { ErrorKind, ErrorSpec, IRContent, IRMessage, IRRequest, IRRequestPart, IRResponse, IRTool, StopReason } from '../core/types.js';
 import { ApiError, defaultStopReason, pieces, requireField, retryHeaders, toolInputString, type Adapter, type RenderContext } from './adapter.js';
-import { anthropicMessage, anthropicStreamEvents, parseAnthropicBody } from './anthropic.js';
+import { anthropicMessage, anthropicStreamEvents, parseAnthropicBody, shapeAnthropicThinking, validateAnthropicThinking } from './anthropic.js';
 import { eventFrame, exceptionFrame } from './eventstream.js';
 
 /**
@@ -63,6 +63,15 @@ export const bedrockAdapter: Adapter = {
     }
     const req = op!.startsWith('converse') ? parseConverse(body, base) : parseInvoke(body, base);
     return { ...req, stream };
+  },
+
+  // Claude bodies on InvokeModel take the same `thinking` config as the Claude API (incl. disabled / between_tools).
+  validate(req, ctx) {
+    if (req.endpoint === 'chat' && shapeOf(req) === 'anthropic') validateAnthropicThinking(req, ctx);
+  },
+
+  shapeResponse(req, res) {
+    return shapeOf(req) === 'anthropic' ? shapeAnthropicThinking(req, res) : res;
   },
 
   render(req, res, ctx) {

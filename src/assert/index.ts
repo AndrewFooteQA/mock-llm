@@ -57,6 +57,8 @@ export interface RequestView {
   stream: boolean;
   maxTokens?: number;
   temperature?: number;
+  /** Anthropic speed mode, if the request set it. */
+  speed?: 'standard' | 'fast';
   headers: Record<string, string>;
 }
 
@@ -318,6 +320,7 @@ function view(r: IRRequest): RequestView {
     stream: r.stream,
     maxTokens: r.maxTokens,
     temperature: r.temperature,
+    speed: r.speed,
     headers: r.headers,
   };
 }

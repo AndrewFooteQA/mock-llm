@@ -942,21 +942,68 @@ domain; versioned docs per release (only the latest release is published).
 **Amendments:** none
 
 ### R22. Anthropic API 2026-10-21: thinking modes, fast mode, model lifecycle
-**Status:** Proposed (from the SDK update playbook, Renovate PR #23: `@anthropic-ai/sdk` 0.131.0 → 1.4.0)
+**Status:** Signed off: 2026-11-03 (criteria agreed the same day; taken ahead of R21 at the maintainer's request)
+**Origin:** the SDK update playbook, Renovate PR #23: `@anthropic-ai/sdk` 0.131.0 → 1.4.0
 **Depends on:** none
 **Goal:** apps on SDK 1.x can test the behaviour the new API version adds. PR #23 already renders the new fields the 1.x
 types declare as always present (`usage.speed`, and `lifecycle` / `line` / `deprecated_at` / `retires_at` on
 models); this item covers behaviour.
 
-**Draft acceptance criteria** (to be agreed before work starts; confirm each wire shape from the SDK source and API docs)
-- [ ] Thinking config: `thinking: { type: 'disabled' }` suppresses scripted `{ thinking }` blocks; `between_tools` emits
+**Acceptance criteria** (agreed 2026-11-03; confirm each wire shape from the SDK source and API docs)
+- [x] Thinking config: `thinking: { type: 'disabled' }` suppresses scripted `{ thinking }` blocks; `between_tools` emits
       them only where the API does (confirm from the docs first)
-- [ ] Fast mode: a `speed` request matcher (`when({ speed: 'fast' })`, YAML too), recorded in the journal
-- [ ] Model lifecycle: the `models` option can mark a model `deprecated` / `retired` (with `retiresAt`); `models.list`
+      *(`tests/contract/anthropic-2026-10-21.test.ts` › "thinking: disabled and between_tools shape the reply" (5, non-streaming
+      and streaming) and "Bedrock InvokeModel (Claude body)" (2); unit `tests/unit/models.test.ts` › shapeAnthropicThinking (3).
+      `between_tools` confirmed from the docs (thinking › Progress updates): no up-front thinking, an update sits directly
+      before the tool call it introduces, at most one per call; without tools the reply is text only.)*
+- [x] Fast mode: a `speed` request matcher (`when({ speed: 'fast' })`, YAML too), recorded in the journal
+      *(contract › "fast mode: the speed matcher" (2: routing, `usage.speed`, `entry.request.speed`, `toHaveReceivedRequest({ speed })`);
+      unit › "speed matcher in scenario files" (accepts / rejects with a message); playground variant "Fast mode".)*
+- [x] Model lifecycle: the `models` option can mark a model `deprecated` / `retired` (with `retiresAt`); `models.list`
       honours the `lifecycle` filter; a request naming a retired model gets the API's native error
-- [ ] `capabilities` on model objects (keys always present, per the 1.x types)
-- [ ] Contract tests through `@anthropic-ai/sdk` ≥ 1.0, SDK-side assertions gated with `sdkAtLeast` for the 0.66.0 floor
-- [ ] Standard criteria: docs + playground lesson variant + an example use (the coverage gate will require one)
+      *(contract › "models: lifecycle and capabilities" (7): default list = active + deprecated (api/models/list), the `lifecycle`
+      filter (`lifecycle[]=…`, SDK 1.x query format), retired still retrievable, `deprecated_at` / `retires_at` from the spec,
+      retired Messages request → `NotFoundError` 404 (flagged unverified, see amendments), deprecated still answers.)*
+- [x] `capabilities` on model objects (keys always present, per the 1.x types)
+      *(contract › "capabilities: every key present; the ModelSpec narrows them"; capability-driven rejections with the
+      verbatim api/errors messages: contract › "thinking: rejections follow the model capabilities" (6); unit › capabilitiesOf (3).)*
+- [x] Contract tests through `@anthropic-ai/sdk` ≥ 1.0, SDK-side assertions gated with `sdkAtLeast` for the 0.66.0 floor
+      *(All of the above run through SDK 1.4.0 in `npm test`. Floor: `npm run compat -- run @anthropic-ai/sdk oldest` →
+      ✔ 0.66.0, 331 passed, 1 skipped: the lifecycle-filter test, gated `sdkAtLeast('@anthropic-ai/sdk', '1.0.0')` because
+      SDK 0.66's `stringifyQuery` throws on arrays (SDK-side; nothing about what the mock sends is gated).)*
+- [x] Standard criteria: docs + playground lesson variant + an example use (the coverage gate will require one)
+      *(Docs: `docs/setup.md` › "Models, lifecycle and capabilities (Claude)", `docs/failures.md` › "Model lifecycle and
+      thinking errors (Claude)", `docs/scripting.md` (`speed` matcher, Anthropic notes), README "What else it catches" row
+      and lesson count; JSDoc on `ModelSpec`, `Matcher.speed`, the adapter hooks. Playground: lesson `claude-2026` (5
+      variants, Claude only) + Reference rows (`models`, `speed`, endpoints, example table). Example:
+      `examples/claude-tool-agent` quick mode (3 tests; `speed`, `between_tools`, capabilities / lifecycle via `ModelSpec`),
+      in all three indexes; `coverage:examples`: 175 covered, 0 uncovered. Changeset: minor. `npm run check` exit 0: 332
+      library tests, 315 lesson runs, 21 site tests, every example.)*
+
+**Amendments** (maintainer decisions, 2026-11-03, after reading the docs)
+- *Retired models:* Anthropic documents only that "requests to retired models fail", not the error. A Messages request
+  naming a model marked `retired` gets 404 `not_found_error` (the mock's answer for an unknown model), and the docs
+  and sign-off flag it as **unverified**, to confirm with R18 (live drift detection).
+- *Which models reject which thinking type:* driven by the model's `capabilities` (set via the `models` option),
+  permissive by default; no built-in per-model table. A type whose `capabilities.thinking.types.<type>.supported` is
+  `false` gets the documented 400 `invalid_request_error` message.
+- *Sources read:* SDK 1.4.0 `resources/messages/messages.d.ts`, `resources/models.d.ts`, `internal/utils/query`
+  (`lifecycle[]=…`, qs brackets); platform.claude.com docs: thinking (per-model table, progress updates), api/errors
+  (exact 400 messages), api/models/list (`lifecycle` default = active + deprecated), models/overview (capabilities).
+
+
+### R23. Anthropic API 2026-10-21 request validation
+**Status:** Proposed (found while researching R22: platform.claude.com/docs/en/api/migration-2026-10-21 › Breaking changes)
+**Depends on:** none
+**Goal:** a request that the 2026-10-21 API rejects is rejected by the mock too, when it is sent with that version, so
+apps that build requests by hand (or cast past the SDK types) find out in tests. `2023-06-01` requests keep working.
+
+**Draft acceptance criteria** (to be agreed before work starts)
+- [ ] With `anthropic-version: 2026-10-21`, a native 400 `invalid_request_error` for: `temperature` / `top_p` /
+      `top_k` (even at defaults); a `document` block directly in an `assistant` message; a `text` block with non-empty
+      `citations` in a `user` message. Same rules on count_tokens. Messages confirmed from the docs, else flagged
+- [ ] `2023-06-01` (and SDKs before 1.0) unchanged; contract tests through both SDK majors (`sdkAtLeast`)
+- [ ] Standard criteria: docs + playground lesson variant + an example use
 
 **Amendments:** none
 

@@ -110,7 +110,7 @@ createMockLLM({
   seed: 1,                 // deterministic lorem, ids, chaos, latency; MOCK_LLM_SEED overrides it; see mock.seed
   latency: { firstTokenMs: 300, tokensPerSec: 50 },  // simulate slowness (off by default); firstTokenMs may be { min, max } or normal
   apiKeys: ['test-key'],   // enforce keys → native 401 otherwise
-  models: ['gpt-4o', 'claude-sonnet-5-5'],           // models endpoints
+  models: ['gpt-4o', 'claude-sonnet-5-5'],           // models endpoints; or ModelSpec entries (see below)
   chaos: { rate: 0.05 },
   strict: true,            // unscripted requests get a 400 and fail the test (see Strict mode)
   onUnmatched: 'error',    // 400 for unscripted requests, without failing the test (default: canned reply)
@@ -122,3 +122,36 @@ createMockLLM({
 ```
 
 Token counts are approximate (~4 chars/token): good for budget assertions, not billing.
+
+### Models, lifecycle and capabilities (Claude)
+
+`models` takes ids or `ModelSpec` entries. Ids are active models with every capability. A spec describes a model the way
+the Claude Models API (API version 2026-10-21) does:
+
+```ts
+import type { ModelSpec } from 'mock-llm';
+
+createMockLLM({
+  models: [
+    'claude-opus-5-5',
+    // Claude Sonnet 5.5 rejects thinking 'disabled' and offers 'between_tools' instead:
+    { id: 'claude-sonnet-5-5', capabilities: { thinking: { types: { disabled: { supported: false } } } } },
+    { id: 'claude-sonnet-4-5-20250929', lifecycle: 'deprecated', retiresAt: '2026-11-30T00:00:00Z' },
+    { id: 'claude-3-7-sonnet-20250219', lifecycle: 'retired' },
+  ] satisfies Array<string | ModelSpec>,
+});
+```
+
+- **`lifecycle`** (`'active'` by default): `models.list()` returns active and deprecated models unless its `lifecycle`
+  filter asks for others, as the API does (SDK ≥ 1.0 sends the filter; older SDKs can't). `models.retrieve()` still finds
+  a retired model. A Messages request naming a retired model fails: see
+  [Model lifecycle and thinking errors](failures.md#model-lifecycle-and-thinking-errors-claude).
+- **`deprecatedAt`, `retiresAt`** (RFC 3339): `deprecated_at` defaults to `2025-01-01T00:00:00Z` for deprecated and
+  retired models (`null` when active); `retires_at` defaults to `null`.
+- **`capabilities`**: a partial object merged over "everything supported", reported on model objects with every key
+  present. `capabilities.thinking.types.<type>.supported: false` makes requests that send that thinking type fail.
+- **`line`, `displayName`**: default to the line in a first-party Claude id (`claude-opus-5-5` → `opus`, else `null`)
+  and to the id.
+- Lifecycle and capabilities are Claude API concepts. The OpenAI and Gemini models endpoints list only the ids. Bedrock
+  runs its own lifecycle, so it ignores `lifecycle`; capability rejections do apply to Claude bodies on Bedrock
+  `InvokeModel` when the spec's `id` is the Bedrock model id.

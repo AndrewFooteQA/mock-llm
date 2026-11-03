@@ -6,6 +6,7 @@ import { toHaveMetExpectations, toHaveNoUnmatchedRequests, toHaveReceivedRequest
 import { Journal, type JournalEntry, type WireRecord } from './core/journal.js';
 import { applyContentChaos, DEFAULT_CHAOS_FAULTS, pickBehaviour, validateChaos, type ChaosBehaviour, type ChaosOptions } from './core/chaos.js';
 import { latencyRng, sampleDelay, validateLatency, type AppliedLatency, type Delay, type LatencySpec } from './core/latency.js';
+import { normalizeModels, type ModelSpec } from './core/models.js';
 import { Rng } from './core/rng.js';
 import { applyInjections, lastUserText, matchModel, Rule, RuleBuilder, toResponse, type Matcher, type Step } from './core/rules.js';
 import { DEFAULT_PRICING, type PriceTable } from './core/pricing.js';
@@ -35,8 +36,11 @@ export interface MockLLMOptions {
   latency?: LatencySpec;
   /** If set, requests must carry one of these API keys or get a native 401. */
   apiKeys?: string[];
-  /** Model ids returned by the models endpoints. */
-  models?: string[];
+  /**
+   * Models returned by the models endpoints: ids, or `{ id, lifecycle, retiresAt, capabilities, … }` entries for the
+   * Anthropic Models API (lifecycle filter, a retired model's 404, capability-driven thinking errors). See `ModelSpec`.
+   */
+  models?: Array<string | ModelSpec>;
   /** Randomly inject faults into a fraction of chat requests (seeded, so reproducible). */
   chaos?: ChaosOptions;
   /** What to do when no rule matches a chat request. Defaults to a short canned reply. */
@@ -118,6 +122,8 @@ export class MockLLM {
    */
   readonly seed: number;
   private state = new Map<string, unknown>();
+  /** `options.models`, normalized (ids in order + specs by id). */
+  private readonly models: ReturnType<typeof normalizeModels>;
   private rules: Rule[] = [];
   private fallback?: Rule;
   private scenarios = new Map<string, Rule>();
@@ -146,6 +152,7 @@ export class MockLLM {
         throw new Error(`mock-llm: invalid contextWindow[${JSON.stringify(key)}] ${JSON.stringify(tokens)}: must be a positive number of tokens`);
       }
     }
+    this.models = normalizeModels(options.models ?? DEFAULT_MODELS);
     this.seed = effectiveSeed(options.seed);
     this.rng = new Rng(this.seed);
     this.latencyRng = latencyRng(this.seed);
@@ -336,7 +343,9 @@ export class MockLLM {
       rng: this.rng,
       usage: { inputTokens: 0, outputTokens: 0 },
       created: Math.floor(startedAt / 1000),
-      models: this.options.models ?? DEFAULT_MODELS,
+      models: this.models.ids,
+      modelSpec: (id) => this.models.specs.get(id),
+      query: url.searchParams,
       state: this.state,
     };
 
@@ -437,6 +446,7 @@ export class MockLLM {
         const key = adapter.apiKey(headers);
         if (!key || !this.options.apiKeys.includes(key)) throw new ApiError({ kind: 'auth' });
       }
+      adapter.validate?.(ir, ctx);
 
       ctx.usage.inputTokens = requestTokens(ir);
 
@@ -488,6 +498,7 @@ export class MockLLM {
         response = applyContentChaos(chaos, response, ir);
         entry.chaos = { seed: this.seed, behaviour: chaos };
       }
+      if (adapter.shapeResponse) response = adapter.shapeResponse(ir, response);
       entry.response = response;
       entry.latency = this.resolveLatency(rule, step?.kind === 'respond' ? step.delay : undefined, step?.kind === 'respond' ? step.chunkIntervalMs : undefined);
       await this.sendResponse(adapter, ir, response, ctx, res, finish, entry.latency);

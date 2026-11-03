@@ -250,6 +250,81 @@ mock.when({ responseFormat: 'json_schema' }).replyFromSchema({ violate: true });
     providers: ['openai', 'openai-responses', 'anthropic', 'gemini', 'bedrock'],
   },
   {
+    id: 'claude-2026',
+    group: 'Agents & structured output',
+    title: 'Claude: thinking modes, fast mode, model lifecycle',
+    intro: `
+      <p>Claude API version <code>2026-10-21</code> (<code>@anthropic-ai/sdk</code> 1.x) changes how a reply looks depending on the request:</p>
+      <ul>
+        <li><code>thinking: { type: 'disabled' }</code>: no thinking blocks, even when the rule scripts <code>{ thinking }</code>.</li>
+        <li><code>thinking: { type: 'between_tools' }</code>: no up-front thinking. A scripted thinking block comes back only as the
+          <em>progress update</em> directly before the tool call it introduces, so a reply without tools is text only.</li>
+        <li><code>speed: 'fast'</code>: route on it with the <code>speed</code> matcher; <code>usage.speed</code> reports it.</li>
+      </ul>
+      <p>Which models accept which thinking type comes from their <code>capabilities</code>, set with the <code>models</code> option
+      (everything is accepted by default). A rejected type gets the API's documented 400 message. The same option marks models
+      <code>deprecated</code> or <code>retired</code>: <code>models.list()</code> hides retired models unless asked, and a request naming one fails
+      (404 <code>not_found_error</code>; Anthropic doesn't document this error, so the shape is unverified).</p>`,
+    test: `const mock = await createMockLLM({
+  models: [
+    { id: 'claude-sonnet-5-5', capabilities: { thinking: { types: { disabled: { supported: false } } } } },
+    { id: 'claude-3-7-sonnet-20250219', lifecycle: 'retired' },
+  ],
+});
+mock.when({}).reply('Your order shipped.', { thinking: 'Checking the order…' });
+
+const r = await claude.messages.create({ ...req, model: 'claude-haiku-5-5', thinking: { type: 'disabled' } });
+expect(r.content.map((b) => b.type)).toEqual(['text']);
+
+await expect(claude.messages.create({ ...req, model: 'claude-sonnet-5-5', thinking: { type: 'disabled' } }))
+  .rejects.toBeInstanceOf(Anthropic.BadRequestError);   // "…send {"type": "between_tools"} instead…"
+await expect(claude.messages.create({ ...req, model: 'claude-3-7-sonnet-20250219' }))
+  .rejects.toBeInstanceOf(Anthropic.NotFoundError);`,
+    yaml: `rules:
+  - when: {}
+    reply: Your order shipped.
+    thinking: Checking the order…`,
+    run: { prompt: 'Where is my order?', model: 'claude-haiku-5-5', thinking: { type: 'disabled' } },
+    variants: [
+      { label: 'thinking: disabled' },
+      {
+        label: 'between_tools (agent loop)',
+        yaml: `rules:
+  - when: { tool: get_weather, hasToolResult: false }
+    toolCall: { name: get_weather, input: { city: Paris }, text: One moment. }
+    thinking: Looking up the Paris forecast.
+  - when: { hasToolResult: true }
+    reply: It's 21°C and sunny in Paris.
+    thinking: The tool answered; no update needed here.`,
+        run: { prompt: "What's the weather in Paris?", model: 'claude-sonnet-5-5', thinking: { type: 'between_tools' }, tools: true, agentLoop: true },
+      },
+      {
+        label: 'Model rejects disabled',
+        run: {
+          model: 'claude-sonnet-5-5',
+          models: [{ id: 'claude-sonnet-5-5', capabilities: { thinking: { types: { disabled: { supported: false } } } } }],
+        },
+        expectError: true,
+      },
+      {
+        label: 'Fast mode',
+        yaml: `rules:
+  - when: { speed: standard }
+    reply: Standard lane.
+  - when: { speed: fast }
+    reply: Fast lane (see usage.speed in the SDK tab).`,
+        run: { model: 'claude-opus-5-5', thinking: null, speed: 'fast' },
+      },
+      {
+        label: 'Retired model',
+        run: { model: 'claude-3-7-sonnet-20250219', thinking: null, models: ['claude-opus-5-5', { id: 'claude-3-7-sonnet-20250219', lifecycle: 'retired' }] },
+        expectError: true,
+      },
+    ],
+    providers: ['anthropic'],
+    tip: 'The same <code>thinking</code> handling applies to Claude request bodies on Bedrock <code>InvokeModel</code>. Bedrock runs its own model lifecycle, so <code>lifecycle</code> only affects the Claude API.',
+  },
+  {
     id: 'retries',
     group: 'Negative testing',
     title: 'Rate limits & retries',

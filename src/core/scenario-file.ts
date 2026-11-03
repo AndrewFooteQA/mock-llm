@@ -40,7 +40,7 @@ export interface ScenarioTarget {
 const ACTIONS = ['reply', 'template', 'json', 'echo', 'lorem', 'toolCall', 'toolCalls', 'fromSchema', 'toolCallFromSchema', 'edge', 'fail'] as const;
 const MODIFIERS = ['stopReason', 'thinking', 'usage', 'delay', 'chunkIntervalMs', 'expectToolResult', 'expectRequest'] as const;
 const RULE_KEYS = ['name', 'when', 'times', 'once', 'inject', 'steps', 'latency'] as const;
-const MATCHER_KEYS = ['provider', 'endpoint', 'model', 'lastUserMessage', 'system', 'anyMessage', 'hasTools', 'tool', 'tools', 'hasToolResult', 'turn', 'stream', 'responseFormat', 'headers'];
+const MATCHER_KEYS = ['provider', 'endpoint', 'model', 'lastUserMessage', 'system', 'anyMessage', 'hasTools', 'tool', 'tools', 'hasToolResult', 'turn', 'stream', 'responseFormat', 'speed', 'headers'];
 const REGEX_KEYS = ['model', 'lastUserMessage', 'system', 'anyMessage'];
 
 /** Load a scenario file from disk (`.json`, `.yaml`, `.yml`). YAML needs the optional `yaml` package. */
@@ -184,6 +184,7 @@ function parseMatcher(when: Record<string, unknown>, where: string): Matcher {
   const m: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(when)) {
     if (!MATCHER_KEYS.includes(k)) throw new Error(`${where}.when: unknown matcher '${k}'. Known: ${MATCHER_KEYS.join(', ')}`);
+    if (k === 'speed' && v !== 'standard' && v !== 'fast') throw new Error(`${where}.when.speed: expected 'standard' or 'fast', got ${JSON.stringify(v)}`);
     if (REGEX_KEYS.includes(k) && typeof v === 'string') m[k] = toRegex(v);
     else if (k === 'headers' && v && typeof v === 'object') {
       m[k] = Object.fromEntries(Object.entries(v).map(([h, hv]) => [h, typeof hv === 'string' ? toRegex(hv) : hv]));

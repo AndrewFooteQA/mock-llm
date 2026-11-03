@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { edge, type JournalEntry, type ReplyOptions } from 'mock-llm';
+import { createMockLLM, edge, type JournalEntry, type ModelSpec, type ReplyOptions } from 'mock-llm';
 import { useMockLLM } from 'mock-llm/vitest';
 import { describe, expect, it } from 'vitest';
 import { AgentError, runAgent } from '../src/agent.js';
@@ -154,3 +154,61 @@ describe('runAgent', () => {
     expect((await runAgent(client(), 'hi', { tools: {} })).answer).toBe('fallback'); // no tools: only the default matches
   });
 });
+
+describe('quick mode (fast, no up-front thinking)', () => {
+  it('sends speed: fast with between_tools thinking, and shows progress updates as status', async () => {
+    mock.when({ speed: 'fast', tool: 'lookup_order' }).replyToolCall('lookup_order', { order_id: 'A-1001' }, { thinking: 'Looking up order A-1001.' });
+    mock.when({ speed: 'fast', hasToolResult: true }).reply('Your order has shipped.', { thinking: 'Not sent: no up-front thinking.' });
+
+    const status: string[] = [];
+    const result = await runAgent(client(), 'Where is order A-1001?', { quick: true, onStatus: (s) => status.push(s) });
+
+    expect(result.answer).toBe('Your order has shipped.');
+    expect(status).toEqual(['Looking up order A-1001.']); // the progress update, nothing from the final turn
+    expect(mock).toHaveReceivedRequestTimes(2, { endpoint: 'chat' });
+    expect(mock).toHaveReceivedRequest({ speed: 'fast' });
+    expect(mock.journal.last()!.request.raw.thinking).toEqual({ type: 'between_tools' });
+  });
+
+  // Model behaviour comes from the models option: capabilities and lifecycle, as the Models API reports them.
+  const withModels = async (models: Array<string | ModelSpec>, run: (c: Anthropic, m: Awaited<ReturnType<typeof createMockLLM>>) => Promise<void>) => {
+    const m = await createMockLLM({ models });
+    try {
+      await run(new Anthropic({ baseURL: m.urls.anthropic, apiKey: 'test', maxRetries: 0 }), m);
+    } finally {
+      await m.stop();
+    }
+  };
+
+  it('keeps adaptive thinking on a model without between_tools (which would reject it with a 400)', () =>
+    withModels([{ id: 'claude-opus-5-5', capabilities: { thinking: { types: { between_tools: { supported: false } } } } }], async (c, m) => {
+      m.when({}).reply('Quick answer.');
+      // Sending between_tools anyway is what the capability check prevents:
+      await expect(
+        c.messages.create({ model: 'claude-opus-5-5', max_tokens: 64, thinking: { type: 'between_tools' }, messages: [{ role: 'user', content: 'hi' }] }),
+      ).rejects.toBeInstanceOf(Anthropic.BadRequestError);
+
+      const logged: string[] = [];
+      expect((await runAgent(c, 'hi', { quick: true, log: (l) => logged.push(l) })).answer).toBe('Quick answer.');
+      expect(m.journal.last()!.request.raw.thinking).toEqual({ type: 'adaptive' });
+      expect(logged).toEqual(['claude-opus-5-5 has no between_tools thinking; quick mode keeps adaptive thinking']);
+    }));
+
+  it('refuses a retired model before calling it, and warns about a deprecated one', () =>
+    withModels(
+      [
+        { id: 'claude-3-7-sonnet-20250219', lifecycle: 'retired' },
+        { id: 'claude-sonnet-4-5-20250929', lifecycle: 'deprecated', retiresAt: '2026-11-30T00:00:00Z' },
+      ],
+      async (c, m) => {
+        await expect(runAgent(c, 'hi', { quick: true, model: 'claude-3-7-sonnet-20250219' })).rejects.toThrow(/is retired/);
+        expect(m).toHaveReceivedRequestTimes(0); // no Messages call was made
+
+        m.when({}).reply('Still answering.');
+        const logged: string[] = [];
+        await runAgent(c, 'hi', { quick: true, model: 'claude-sonnet-4-5-20250929', log: (l) => logged.push(l) });
+        expect(logged).toContain('warning: claude-sonnet-4-5-20250929 is deprecated and retires 2026-11-30T00:00:00Z');
+      },
+    ));
+});
+

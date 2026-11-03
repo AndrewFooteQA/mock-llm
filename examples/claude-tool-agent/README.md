@@ -9,6 +9,9 @@ A manual tool-use loop on the official `@anthropic-ai/sdk`, tested with mock-llm
   (`system`, `turn`, `hasTools`, `stream`, `anyMessage`, or a `where` predicate)
 - **stream** every turn with `messages.stream()` (`stream: true`), including a tool-use turn whose input arrives in pieces
 - keep **reasoning** (`reply(text, { thinking })`) out of the answer while logging it; the agent asks for adaptive thinking
+- run a **quick mode** (API 2026-10-21): `speed: 'fast'` and `thinking: { type: 'between_tools' }`, with the model's progress
+  updates shown as status lines. The agent reads the model's `capabilities` and `lifecycle` from the Models API first;
+  tests describe models with `ModelSpec` entries in the `models` option and route on the `speed` matcher
 - test **malformed tool arguments** and **schema-generated tool input** (`replyToolCallFromSchema`), and check the tools
   offered (`toHaveOfferedTool`)
 

@@ -88,6 +88,33 @@ createMockLLM({ contextWindow: { 'gpt-4o': 128_000, 'claude-*': 200_000, '*': 8_
 
 `faults.contextLengthExceeded({ details: { limit, inputTokens } })` gives the same error on demand, for a single rule.
 
+### Model lifecycle and thinking errors (Claude)
+
+Requests the Claude API rejects because of the model, driven by the [`models` option](setup.md#models-lifecycle-and-capabilities-claude):
+
+```ts
+createMockLLM({
+  models: [
+    { id: 'claude-sonnet-5-5', capabilities: { thinking: { types: { disabled: { supported: false } } } } },
+    { id: 'claude-3-7-sonnet-20250219', lifecycle: 'retired' },
+  ],
+});
+```
+
+- **A thinking type the model rejects** (`capabilities.thinking.types.<type>.supported: false`) gets a native 400
+  `invalid_request_error` (`BadRequestError`; Bedrock: `ValidationException`) with the API's documented message, e.g.
+  `To turn thinking off on this model, send "thinking": {"type": "between_tools"} instead of {"type": "disabled"}. …`
+  when `between_tools` is still supported, or `"thinking.type.disabled" is not supported for this model. …` when it
+  isn't. Without a spec every type is accepted, so nothing fails on model grounds unless a test says so.
+- **Malformed thinking config**, for any model: `between_tools` with another field (`display`, `budget_tokens`, …),
+  `display` with `disabled`, or an unknown `type` get a 400 `invalid_request_error`. The status and type are
+  documented; the message text is mock-llm's.
+- **A retired model** named in a Messages request gets a 404 `not_found_error` (`NotFoundError`), `model: <id>`.
+  **Unverified:** Anthropic documents only that requests to retired models fail, not the error, so this is the mock's
+  unknown-model answer. Deprecated models keep answering.
+- **Order:** these checks run after the API-key check and before any rule, like the API's own validation. The journal
+  records a 400 / 404 with no `fault`.
+
 ## Awkward outputs (edge cases)
 
 ```ts
