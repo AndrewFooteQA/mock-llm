@@ -79,6 +79,30 @@ describe('anthropic: messages', () => {
   });
 });
 
+describe('anthropic: API 2026-10-21 fields (SDK 1.x types them as always present)', () => {
+  it('usage.speed: the mode the request ran in, standard unless it asked for fast', async () => {
+    mock.when({}).reply('ok');
+    expect((await ask('x')).usage.speed).toBe('standard');
+    // `speed` is a request param from SDK 1.0; older SDKs pass it through as an unknown body field.
+    expect((await ask('x', { speed: 'fast' } as Partial<Anthropic.MessageCreateParamsNonStreaming>)).usage.speed).toBe('fast');
+  });
+
+  it('usage.speed on the streamed message_start, kept on the final message', async () => {
+    mock.when({}).reply('streamed');
+    const final = await client().messages.stream({ model: MODEL, max_tokens: 64, messages: [{ role: 'user', content: 'q' }] }).finalMessage();
+    expect(final.usage.speed).toBe('standard');
+  });
+
+  it('models carry lifecycle, line, deprecated_at and retires_at', async () => {
+    const all = [];
+    for await (const m of client().models.list()) all.push(m);
+    expect(all.find((m) => m.id === MODEL)).toMatchObject({ lifecycle: 'active', line: 'sonnet', deprecated_at: null, retires_at: null });
+    expect(await client().models.retrieve(MODEL)).toMatchObject({ type: 'model', id: MODEL, lifecycle: 'active', line: 'sonnet' });
+    // Not a first-party Claude id, so no line (the API says not to infer one from the id).
+    expect(all.find((m) => !m.id.startsWith('claude-'))).toMatchObject({ lifecycle: 'active', line: null });
+  });
+});
+
 describe('anthropic: edge cases and faults', () => {
   it('refusal stop_reason', async () => {
     mock.when({}).reply(edge.refusal());
