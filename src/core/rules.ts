@@ -32,6 +32,8 @@ export interface Matcher {
   turn?: number;
   stream?: boolean;
   responseFormat?: 'text' | 'json_object' | 'json_schema';
+  /** Anthropic speed mode (`speed` request param). A request that doesn't set it counts as `'standard'`, the API default. */
+  speed?: 'standard' | 'fast';
   headers?: Record<string, TextMatch>;
   where?: (req: IRRequest) => boolean;
 }
@@ -398,6 +400,7 @@ export function matches(m: Matcher, req: IRRequest): boolean {
   }
   if (m.stream !== undefined && m.stream !== req.stream) return false;
   if (m.responseFormat !== undefined && (req.responseFormat?.type ?? 'text') !== m.responseFormat) return false;
+  if (m.speed !== undefined && (req.speed ?? 'standard') !== m.speed) return false;
   if (m.headers) {
     for (const [k, v] of Object.entries(m.headers)) if (!test(v, req.headers[k.toLowerCase()])) return false;
   }

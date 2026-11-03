@@ -1,6 +1,7 @@
 import { chunkText, textPieces } from '../core/tokens.js';
 import type { ErrorSpec, IRContent, IRMessage, IRRequest, IRRequestPart, IRResponse, IRTool, StopReason } from '../core/types.js';
 import type { Rng } from '../core/rng.js';
+import { capabilitiesOf, type ModelCapabilities, type ModelLifecycle } from '../core/models.js';
 import {
   ApiError,
   defaultStopReason,
@@ -51,6 +52,16 @@ export const anthropicAdapter: Adapter = {
     return parseAnthropicBody(body, base, { requireMaxTokens: endpoint === 'chat' });
   },
 
+  validate(req, ctx) {
+    if (req.endpoint !== 'chat') return;
+    // Anthropic documents only that requests to a retired model fail. 404 not_found_error (the mock's unknown-model
+    // answer) is unverified: see ModelSpec.lifecycle.
+    if (ctx.modelSpec(req.model)?.lifecycle === 'retired') throw new ApiError({ kind: 'not_found', message: `model: ${req.model}` });
+    validateAnthropicThinking(req, ctx);
+  },
+
+  shapeResponse: shapeAnthropicThinking,
+
   render(req, res, ctx) {
     return { status: 200, headers: requestId(ctx), body: anthropicMessage(req, res, ctx) };
   },
@@ -78,28 +89,47 @@ export const anthropicAdapter: Adapter = {
     if (req.endpoint === 'count_tokens') {
       return { status: 200, headers: requestId(ctx), body: { input_tokens: ctx.usage.inputTokens } };
     }
-    // SDK ≥ 1.0 (API 2026-10-21) types lifecycle, line, deprecated_at and retires_at as always present.
-    const model = (id: string) => ({
-      type: 'model',
-      id,
-      display_name: id,
-      created_at: '2025-01-01T00:00:00Z',
-      lifecycle: 'active',
-      line: modelLine(id),
-      deprecated_at: null,
-      retires_at: null,
-    });
     if (req.model) {
       if (!ctx.models.includes(req.model)) throw new ApiError({ kind: 'not_found', message: `model: ${req.model}` });
-      return { status: 200, headers: requestId(ctx), body: model(req.model) };
+      return { status: 200, headers: requestId(ctx), body: modelInfo(req.model, ctx) }; // retired models stay retrievable
     }
+    // `lifecycle[]=…` (the SDK's query format). Omitted: active and deprecated; retired only when asked for.
+    const wanted = [...ctx.query.getAll('lifecycle[]'), ...ctx.query.getAll('lifecycle')];
+    const bad = wanted.findIndex((l) => !LIFECYCLES.includes(l as ModelLifecycle));
+    if (bad !== -1) throw new ApiError({ kind: 'bad_request', message: `lifecycle.${bad}: Input should be 'active', 'deprecated' or 'retired'` });
+    const stages = wanted.length ? wanted : ['active', 'deprecated'];
+    const data = ctx.models.map((id) => modelInfo(id, ctx)).filter((m) => stages.includes(m.lifecycle));
     return {
       status: 200,
       headers: requestId(ctx),
-      body: { data: ctx.models.map(model), has_more: false, first_id: ctx.models[0] ?? null, last_id: ctx.models.at(-1) ?? null },
+      body: { data, has_more: false, first_id: data[0]?.id ?? null, last_id: data.at(-1)?.id ?? null },
     };
   },
 };
+
+const LIFECYCLES: ModelLifecycle[] = ['active', 'deprecated', 'retired'];
+
+/**
+ * A Models API object. SDK ≥ 1.0 (API 2026-10-21) types `capabilities`, `lifecycle`, `line`, `deprecated_at` and
+ * `retires_at` as always present; the `models` option's ModelSpec sets them (default: active, every capability).
+ */
+function modelInfo(id: string, ctx: RenderContext) {
+  const spec = ctx.modelSpec(id);
+  const lifecycle: ModelLifecycle = spec?.lifecycle ?? 'active';
+  return {
+    type: 'model',
+    id,
+    display_name: spec?.displayName ?? id,
+    created_at: '2025-01-01T00:00:00Z',
+    capabilities: capabilitiesOf(spec),
+    lifecycle,
+    line: spec?.line !== undefined ? spec.line : modelLine(id),
+    deprecated_at: spec?.deprecatedAt ?? (lifecycle === 'active' ? null : '2025-01-01T00:00:00Z'),
+    retires_at: spec?.retiresAt ?? null,
+    max_input_tokens: null,
+    max_tokens: null,
+  };
+}
 
 /** Parse an Anthropic Messages body (also used for Claude on Bedrock InvokeModel). */
 export function parseAnthropicBody(body: any, base: IRRequest, opts: { requireMaxTokens: boolean }): IRRequest {
@@ -141,7 +171,74 @@ export function parseAnthropicBody(body: any, base: IRRequest, opts: { requireMa
     stream: body.stream === true,
     maxTokens: body.max_tokens,
     temperature: body.temperature,
+    speed: body.speed === 'fast' || body.speed === 'standard' ? body.speed : undefined,
   };
+}
+
+const THINKING_TYPES = ['adaptive', 'enabled', 'disabled', 'between_tools'] as const;
+type ThinkingType = (typeof THINKING_TYPES)[number];
+
+/**
+ * The `thinking` config checks from Anthropic's docs (api/errors, build-with-claude/thinking): `between_tools` takes no
+ * other field and `display` is invalid with `disabled` (status and type documented; the message is the mock's), and a
+ * type the model's `capabilities` mark unsupported gets the documented 400 message. Capabilities come from the
+ * `models` option and default to everything supported, so nothing is rejected on model grounds unless a test says so.
+ */
+export function validateAnthropicThinking(req: IRRequest, ctx: RenderContext): void {
+  const thinking = req.raw?.thinking;
+  if (thinking == null) return;
+  const type = thinking.type as ThinkingType;
+  if (!THINKING_TYPES.includes(type)) {
+    throw new ApiError({ kind: 'bad_request', message: `thinking.type: Input should be 'adaptive', 'enabled', 'disabled' or 'between_tools'` });
+  }
+  const extra = Object.keys(thinking).find((k) => k !== 'type');
+  if (type === 'between_tools' && extra) throw new ApiError({ kind: 'bad_request', message: `thinking.${extra}: Extra inputs are not permitted` });
+  if (type === 'disabled' && 'display' in thinking) throw new ApiError({ kind: 'bad_request', message: 'thinking.display: Extra inputs are not permitted' });
+  const types = capabilitiesOf(ctx.modelSpec(req.model)).thinking.types;
+  if (!types[type].supported) throw new ApiError({ kind: 'bad_request', message: thinkingNotSupported(type, types) });
+}
+
+/** The API's 400 message for a thinking type the model rejects (verbatim from platform.claude.com/docs/en/api/errors). */
+function thinkingNotSupported(type: ThinkingType, types: ModelCapabilities['thinking']['types']): string {
+  const useAdaptive = 'Use "thinking.type.adaptive" and "output_config.effort" to control thinking behavior.';
+  switch (type) {
+    case 'adaptive':
+      return 'adaptive thinking is not supported on this model';
+    case 'enabled':
+      return `"thinking.type.enabled" is not supported for this model. ${useAdaptive}`;
+    case 'between_tools':
+      return '"thinking.type.between_tools" is not supported for this model.';
+    case 'disabled':
+      if (types.between_tools.supported) {
+        return 'To turn thinking off on this model, send "thinking": {"type": "between_tools"} instead of {"type": "disabled"}. The model does not think before responding. The short updates it writes between tool calls come back as thinking blocks.';
+      }
+      if (types.enabled.supported) {
+        return '"thinking.type.disabled" is not supported for this model. Thinking defaults to adaptive mode when not specified; use "thinking.type.enabled" with "budget_tokens" for extended thinking.';
+      }
+      return `"thinking.type.disabled" is not supported for this model. ${useAdaptive}`;
+  }
+}
+
+/**
+ * Thinking blocks the request's `thinking` config allows. `disabled`: none. `between_tools`: no up-front thinking;
+ * a scripted thinking block comes back only as a progress update, moved to sit directly before the tool call it
+ * introduces (at most one per call), so a reply without tool calls is text only. Other configs: unchanged.
+ */
+export function shapeAnthropicThinking(req: IRRequest, res: IRResponse): IRResponse {
+  const type = req.raw?.thinking?.type;
+  if ((type !== 'disabled' && type !== 'between_tools') || !res.content.some((c) => c.type === 'thinking')) return res;
+  if (type === 'disabled') return { ...res, content: res.content.filter((c) => c.type !== 'thinking') };
+  const content: IRContent[] = [];
+  let update: IRContent | undefined;
+  for (const c of res.content) {
+    if (c.type === 'thinking') update = c;
+    else {
+      if (c.type === 'tool_call' && update) content.push(update);
+      if (c.type === 'tool_call') update = undefined;
+      content.push(c);
+    }
+  }
+  return { ...res, content };
 }
 
 /** Non-streaming Messages response body. */
@@ -245,7 +342,7 @@ function usage(req: IRRequest, ctx: RenderContext) {
     service_tier: 'standard',
     // The speed mode the request ran in. SDK ≥ 1.0 types it as always present on first-party usage; not sent on
     // Bedrock, whose Claude bodies don't document it.
-    ...(req.provider === 'anthropic' && { speed: req.raw?.speed === 'fast' ? 'fast' : 'standard' }),
+    ...(req.provider === 'anthropic' && { speed: req.speed ?? 'standard' }),
   };
 }
 

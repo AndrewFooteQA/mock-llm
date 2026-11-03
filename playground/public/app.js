@@ -816,7 +816,7 @@ async function renderReference() {
       ${row('seed', 'Deterministic lorem text, ids, schema values, chaos and random latency. <code>MOCK_LLM_SEED</code> overrides it; <code>mock.seed</code> is the effective seed. Strict reports, chaos error messages and matcher failures say how to reproduce.')}
       ${row('latency', '<code>{ firstTokenMs, tokensPerSec }</code>, off by default. <code>firstTokenMs</code> may be ms, <code>{ min, max }</code> or <code>{ distribution: \'normal\', mean, stdDev }</code> (seeded). Rules and steps override it.')}
       ${row('apiKeys', 'If set, requests must carry one of these keys or receive a native auth error.')}
-      ${row('models', 'Ids returned by the models endpoints.')}
+      ${row('models', 'Models returned by the models endpoints: ids, or <code>{ id, lifecycle, deprecatedAt, retiresAt, line, displayName, capabilities }</code> entries (<code>ModelSpec</code>) for the Claude API. <code>lifecycle: \'deprecated\' | \'retired\'</code>: <code>models.list()</code> hides retired models unless its <code>lifecycle</code> filter asks; a Messages request naming a retired model gets 404 <code>not_found_error</code> (<b>unverified</b>: Anthropic doesn\'t document the error). <code>capabilities</code> (partial, merged over &ldquo;everything supported&rdquo;): a thinking type marked unsupported gets the documented 400 message.')}
       ${row('chaos', '<code>{ rate, weights?, faults? }</code>: a seeded fraction of chat requests misbehave. <code>weights</code> over <code>error</code>, <code>refusal</code>, <code>empty</code>, <code>truncated</code> (your reply cut at max_tokens), <code>malformedToolCall</code> (only with tools). Default: errors only. Recorded as <code>entry.chaos = { seed, behaviour }</code>.')}
       ${row('strict', 'Unscripted chat requests get a native 400 and fail the test (<code>assertNoUnmatched()</code>, run automatically by <code>useMockLLM({ strict: true })</code>).')}
       ${row('onUnmatched', "<code>'reply'</code> (default canned reply) or <code>'error'</code> (400 without failing the test).")}
@@ -836,6 +836,7 @@ async function renderReference() {
       ${row('hasToolResult', 'The last turn carries tool results (agent loop continuation)')}
       ${row('turn', '1-based count of user turns')}
       ${row('stream · responseFormat', "Streaming request · <code>'text' | 'json_object' | 'json_schema'</code>")}
+      ${row('speed', "Claude fast mode: <code>'standard' | 'fast'</code>. A request without <code>speed</code> counts as <code>'standard'</code>")}
       ${row('headers · where', 'Header substring/RegExp map · custom predicate on the normalized request')}
     </tbody></table>
 
@@ -906,7 +907,7 @@ async function renderReference() {
     <p>Standalone starter projects live in <code>examples/</code> in the repo. Each one pairs real app code with tests against mock-llm. Copy one to get started.</p>
     <table class="grid"><tbody>
       ${row('openai-support-bot', 'OpenAI Chat + Vitest: every fault (incl. <code>raw</code>, connection reset + 500 retries counted from the journal, <code>apiKeys</code> → 401), refusals, empty / truncated / long / unicode output, escaping + <code>inject</code>, context window, seeded chaos; <b>strict mode</b> + <code>unmatched</code> event; a <b>shared YAML baseline</b> (<code>scenarioFiles</code>) across tests; an expectation step + strict mode failing for the checked reason; request / prompt / token matchers')}
-      ${row('claude-tool-agent', 'Claude + Vitest: tool loops (parallel, hallucinated, malformed, schema-generated input), runaway loops, <b>messages.stream()</b> incl. a streamed tool turn, <code>{ thinking }</code> logged not shown; routing on system / turn / tools / stream / any message / <code>where</code>; tool matchers incl. <code>toHaveOfferedTool</code>')}
+      ${row('claude-tool-agent', 'Claude + Vitest: tool loops (parallel, hallucinated, malformed, schema-generated input), runaway loops, <b>messages.stream()</b> incl. a streamed tool turn, <code>{ thinking }</code> logged not shown; routing on system / turn / tools / stream / any message / <code>where</code>; tool matchers incl. <code>toHaveOfferedTool</code>; quick mode: <code>speed</code> matcher, <code>between_tools</code> progress updates, model <code>capabilities</code> / <code>lifecycle</code> from the <code>models</code> option')}
       ${row('gemini-structured-extraction', 'Gemini + Vitest: JSON schema output, violations, repair-and-retry, <b>generateContentStream</b> + a mid-stream error, <b>Vertex AI</b> client, <code>fakeFromSchema</code> fixtures; request / prompt matchers')}
       ${row('bedrock-streaming-summarizer', 'Bedrock + Vitest: ConverseStream, Converse, InvokeModel and InvokeModelWithResponseStream (Claude body), max_tokens truncation, cuts, throttling, per-step and per-rule latency; <b>events</b> incl. <code>fault</code>; the <code>wire</code> record')}
       ${row('node-service-e2e', 'OpenAI & Claude + node:test: child-process service via mock.env(), YAML QA scenarios (expectation steps, header routing, echo / lorem / json), forwarded <code>x-mock-scenario</code>, a sweep of every built-in scenario; assertions as plain functions, <code>ExpectationError</code>')}
@@ -919,7 +920,7 @@ async function renderReference() {
     <h2 id="Endpoints">Base URLs & endpoints</h2>
     <table class="grid"><tbody>
       ${row('mock.urls.openai', '<code>/v1/chat/completions</code>, <code>/v1/responses</code>, <code>/v1/embeddings</code>, <code>/v1/models</code>')}
-      ${row('mock.urls.anthropic', '<code>/v1/messages</code>, <code>/v1/messages/count_tokens</code>, <code>/v1/models</code>. Responses carry the fields SDK 1.x (API 2026-10-21) types as always present: <code>usage.speed</code> (<code>standard</code>, or <code>fast</code> when requested) and, on models, <code>lifecycle: \'active\'</code>, <code>line</code>, <code>deprecated_at</code>, <code>retires_at</code>')}
+      ${row('mock.urls.anthropic', '<code>/v1/messages</code>, <code>/v1/messages/count_tokens</code>, <code>/v1/models</code>. Responses carry the fields SDK 1.x (API 2026-10-21) types as always present: <code>usage.speed</code> (<code>standard</code>, or <code>fast</code> when requested) and, on models, <code>capabilities</code>, <code>lifecycle</code>, <code>line</code>, <code>deprecated_at</code>, <code>retires_at</code> (from the <code>models</code> option; default active, every capability). <code>thinking: disabled | between_tools</code> shape the reply (also on Bedrock <code>InvokeModel</code> Claude bodies)')}
       ${row('mock.urls.gemini', '<code>/v1beta/models/{m}:generateContent | streamGenerateContent | countTokens | embedContent</code>, plus Vertex paths (incl. <code>:predict</code> embeddings)')}
       ${row('mock.urls.bedrock', '<code>/model/{id}/converse | converse-stream | invoke | invoke-with-response-stream | count-tokens</code>')}
     </tbody></table>

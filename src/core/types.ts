@@ -42,6 +42,8 @@ export interface IRRequest {
   stream: boolean;
   maxTokens?: number;
   temperature?: number;
+  /** Anthropic inference speed mode, when the request sets it (`speed`, API 2026-10-21). Omitted means standard. */
+  speed?: 'standard' | 'fast';
   /** Lower-cased request headers. */
   headers: Record<string, string>;
   /** Original parsed JSON body, for anything the IR doesn't model. */

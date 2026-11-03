@@ -136,6 +136,8 @@ const drivers = {
         ...(o.system && { system: o.system }),
         ...(o.tools && { tools: [{ name: WEATHER.name, description: WEATHER.description, input_schema: WEATHER.schema }] }),
         ...(o.structured && { output_config: { format: { type: 'json_schema', schema: REVIEW_SCHEMA } } }),
+        ...(o.thinking && { thinking: o.thinking }),
+        ...(o.speed && { speed: o.speed }),
       };
       let raw;
       if (o.stream) {
@@ -342,6 +344,9 @@ async function run(body, send) {
     maxRetries: Number(body.maxRetries ?? 0),
     timeoutMs: body.timeoutMs ? Number(body.timeoutMs) : undefined,
     headers: body.scenarioHeader ? { 'x-mock-scenario': body.scenarioHeader } : undefined,
+    // Claude only (API 2026-10-21): thinking config and fast mode, sent as-is.
+    thinking: body.thinking || undefined,
+    speed: body.speed || undefined,
   };
 
   let rules;
@@ -351,7 +356,7 @@ async function run(body, send) {
     return send('error', { name: 'ScenarioParseError', message: e.message });
   }
 
-  const mock = await createMockLLM({ seed: Number(body.seed ?? 1), latency: body.latency, strict: !!body.strict, contextWindow: body.contextWindow, chaos: body.chaos });
+  const mock = await createMockLLM({ seed: Number(body.seed ?? 1), latency: body.latency, strict: !!body.strict, contextWindow: body.contextWindow, chaos: body.chaos, models: body.models });
   const started = Date.now();
   // Mirror mock events to the browser (Events tab) via the public mock.on() API.
   let chunkEvents = 0;

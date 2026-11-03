@@ -1,3 +1,4 @@
+import type { ModelSpec } from '../core/models.js';
 import type { Rng } from '../core/rng.js';
 import type { Endpoint, ErrorSpec, IRRequest, IRResponse, IRUsage, Provider } from '../core/types.js';
 
@@ -15,6 +16,10 @@ export interface RenderContext {
   created: number;
   /** Model ids advertised by the models endpoints. */
   models: string[];
+  /** The `models` option entry for an id (lifecycle, capabilities), if it gave one. */
+  modelSpec(id: string): ModelSpec | undefined;
+  /** The request URL's query string. */
+  query: URLSearchParams;
   /** Per-mock mutable state (e.g. stored Responses API conversations). Cleared by reset(). */
   state: Map<string, unknown>;
 }
@@ -36,6 +41,13 @@ export interface Adapter {
   route(method: string, path: string): Endpoint | null;
   /** Parse and validate a request body. Throws ApiError on invalid input. */
   parse(endpoint: Endpoint, body: any, headers: Record<string, string>, path: string, state: Map<string, unknown>): IRRequest;
+  /**
+   * Checks that need the mock's configuration (e.g. a retired model, a capability the model lacks). Runs after
+   * `parse` and the API-key check, before rules. Throws ApiError, rendered like a validation error.
+   */
+  validate?(req: IRRequest, ctx: RenderContext): void;
+  /** Adjust a chat reply to what the request asked for (e.g. no thinking blocks when thinking is disabled). */
+  shapeResponse?(req: IRRequest, res: IRResponse): IRResponse;
   /** The API key the client sent, if any (used when `apiKeys` is configured). */
   apiKey(headers: Record<string, string>): string | undefined;
   /** Non-streaming chat response body. */
