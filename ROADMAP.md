@@ -942,7 +942,7 @@ domain; versioned docs per release (only the latest release is published).
 **Amendments:** none
 
 ### R22. Anthropic API 2026-10-21: thinking modes, fast mode, model lifecycle
-**Status:** Ready for sign-off (criteria agreed by the maintainer 2026-11-03; taken ahead of R21 at the maintainer's request)
+**Status:** Signed off: 2026-11-03 (criteria agreed the same day; taken ahead of R21 at the maintainer's request)
 **Origin:** the SDK update playbook, Renovate PR #23: `@anthropic-ai/sdk` 0.131.0 → 1.4.0
 **Depends on:** none
 **Goal:** apps on SDK 1.x can test the behaviour the new API version adds. PR #23 already renders the new fields the 1.x
