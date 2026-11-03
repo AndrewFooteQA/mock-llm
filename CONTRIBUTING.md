@@ -19,7 +19,7 @@ Every change ships with:
 
 1. **Tests.** Unit tests in `tests/unit`, plus contract tests in `tests/contract` for anything provider-facing. Contract
    tests use the provider's official SDK against the mock.
-2. **Docs.** Update the README section and the playground lesson or Reference page (`playground/public`).
+2. **Docs.** Update the README or the `docs/` guide section and the playground lesson or Reference page (`playground/public`).
 3. **Examples.** Update or add a project in `examples/` when the change affects how people use the library.
    `npm run coverage:examples` shows which features the examples use. A new export, fault, matcher or option fails
    `npm run check` until an example uses it, or until it's exempted in `examples/coverage.json` with a one-line reason

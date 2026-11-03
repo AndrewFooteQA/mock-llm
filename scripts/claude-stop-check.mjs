@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const STATE = join(root, '.claude', '.dod-state.json');
-const WATCH = ['src', 'tests', 'playground', 'examples', 'scripts', 'README.md', 'CLAUDE.md', 'package.json', 'vitest.config.ts', 'tsconfig.json', 'tsconfig.build.json'];
+const WATCH = ['src', 'tests', 'playground', 'examples', 'scripts', 'README.md', 'docs', 'CLAUDE.md', 'package.json', 'vitest.config.ts', 'tsconfig.json', 'tsconfig.build.json'];
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
 // Lockfiles are rewritten by `npm run test:examples` itself (the packed mock-llm changes every build).
 const SKIP_FILES = new Set(['package-lock.json']);
@@ -97,8 +97,8 @@ if (changed && touched('src')) {
   if (!touched('tests')) {
     reminders.push('src/ changed but nothing under tests/ did. Add tests (a regression test for bug fixes; a contract test through the official SDK for wire-format changes).');
   }
-  if (!touched('README.md') && !touched('playground/public')) {
-    reminders.push('src/ changed but neither README.md nor the playground (lessons.js / Reference in app.js) did. Update the docs and tutorial for any user-facing change.');
+  if (!touched('README.md') && !touched('docs') && !touched('playground/public')) {
+    reminders.push('src/ changed but neither README.md, docs/ nor the playground (lessons.js / Reference in app.js) did. Update the docs and tutorial for any user-facing change.');
   }
   if (!touched('examples')) {
     reminders.push('No example project changed. Confirm no example should demonstrate this (new providers or major features need one).');
