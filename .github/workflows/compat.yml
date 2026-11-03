@@ -24,7 +24,7 @@ jobs:
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - id: plan
         env:
           EVENT: ${{ github.event_name }}
@@ -43,8 +43,8 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -62,7 +62,7 @@ jobs:
         run: |
           mkdir -p out
           [ -f result.json ] && cp result.json "out/$(echo "$NAME" | tr '/@' '__').json" || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: compat-${{ strategy.job-index }}
@@ -81,11 +81,11 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-      - uses: actions/download-artifact@v5
+          node-version: 26
+      - uses: actions/download-artifact@v8
         with:
           path: results
           pattern: compat-*
