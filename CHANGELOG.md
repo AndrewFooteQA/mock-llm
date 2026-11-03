@@ -1,5 +1,17 @@
 # mock-llm
 
+## 0.2.3
+
+### Patch Changes
+
+- 5084725: Anthropic: responses include the fields `@anthropic-ai/sdk` 1.x (API version 2026-10-21) types as always present.
+  `usage.speed` is `"standard"`, or `"fast"` when the request asks for it (first-party API only, not Bedrock). Model objects
+  from `models.list()` / `models.retrieve()` carry `lifecycle: "active"`, `line` (`opus`, `sonnet`, … for Claude ids,
+  otherwise `null`), `deprecated_at: null` and `retires_at: null`.
+- be76bec: README: leads with a failure mock-llm catches (a JSON reply cut off at `max_tokens`), adds npm, CI, compatibility and
+  license badges, and moves the reference sections to guides in `docs/` (setup, scripting, failures, assertions) so the npm
+  page stays short.
+
 ## 0.2.2
 
 ### Patch Changes
