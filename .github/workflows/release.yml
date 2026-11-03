@@ -43,6 +43,13 @@ jobs:
       # v2 reads the CHANGESETS_OUTPUT file that `changeset publish` (CLI v3) writes, to detect what was
       # published, push the vX.Y.Z tag and create the GitHub release. (v1 parsed log lines that CLI v3
       # no longer prints, so it missed the 0.1.0 publish.)
+      # Is the current version already on npm? Compared with the same check after the changesets step, this tells us
+      # whether this run published, even if that step failed afterwards (e.g. a GitHub API timeout creating the
+      # GitHub Release, as happened with 0.2.2).
+      - id: before
+        name: Version on npm before publishing?
+        run: node scripts/release-state.mjs before
+
       - id: changesets
         uses: changesets/action@v2
         with:
@@ -57,15 +64,21 @@ jobs:
         if: failure()
         run: grep -hiE "oidc|trusted|provenance|E40[134]" ~/.npm/_logs/*.log | tail -40 || true
 
+      - id: after
+        name: Did this run publish? (npm before vs. after, waiting for propagation)
+        if: always() && steps.before.outcome == 'success'
+        run: node scripts/release-state.mjs after "${{ steps.before.outputs.existed }}"
+
+      # These run whenever this run published, even if the changesets step failed after publishing.
       - name: Verify the published package against every example
-        if: steps.changesets.outputs.published == 'true'
+        if: always() && steps.after.outputs.published == 'true'
         run: npm run verify:published
 
-      # A separate workflow run, so a failed docs deploy never marks the npm release as failed.
+      # A separate workflow run, so a failed docs deploy never marks the npm release as failed. It builds the commit
+      # that was published (identical to the tag, which may not exist if the tag push is what failed).
       - name: Deploy the docs site for this release (Pages workflow)
-        if: steps.changesets.outputs.published == 'true'
+        if: always() && steps.after.outputs.published == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-          PACKAGES: ${{ steps.changesets.outputs.published-packages }}
-        run: gh workflow run pages.yml --ref main -f ref="v$(node -e 'console.log(JSON.parse(process.env.PACKAGES)[0].version)')"
+        run: gh workflow run pages.yml --ref main -f ref="${{ github.sha }}"
