@@ -6,7 +6,7 @@
     "test": "tsc --noEmit && vitest run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
+    "@anthropic-ai/sdk": "^0.137.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1146.0",
     "@google/genai": "^2.27.0",
     "openai": "^7.28.0"
