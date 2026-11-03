@@ -29,7 +29,10 @@ A change is not finished until all three parts are done, **in the same change**:
    - Library-internal logic (rules, schema faker, scenario files, journal) gets unit tests in `tests/unit/`.
 
 2. **Docs & tutorial**
-   - `README.md`: any user-facing API, option, fault, edge case, scenario or provider behaviour.
+   - `README.md` and `docs/`: any user-facing API, option, fault, edge case, scenario or provider behaviour. The README is
+     the front page (the bug it catches, install, quick start, indexes); reference sections live in `docs/setup.md`,
+     `docs/scripting.md`, `docs/failures.md` and `docs/assertions.md`. `tests/unit/docs-links.test.ts` checks every
+     relative link and `#anchor`.
    - Playground (`playground/`), the live docs site:
      - `public/lessons.js`: add or extend a lesson or variant when a feature is something users *do*. Mark
        variants that are meant to end in an SDK error with `expectError: true`. Lesson rules must script every
@@ -130,6 +133,7 @@ src/testing/       mock-llm/vitest + mock-llm/jest adapters (lifecycle + matcher
                    mock-llm/playwright: shared mock via startMockLLM (globalSetup) + RemoteMockLLM (src/remote.ts) over
                    the /__mock/* control API; async matchers; proven in examples/playwright-chat-ui (Chromium)
 tests/unit|contract  library tests (vitest.config.ts restricts the root run to tests/)
+docs/              reference guides linked from the README (setup, scripting, failures, assertions)
 playground/        docs + live tutorial (server.mjs, public/*, check.mjs). Also the hosted static site (GitHub Pages):
                    public/runs.js (every run + its key), public/transport.js (live server or recorded replay),
                    check.mjs --record (recordings), build.mjs (site/), site.spec.mjs (smoke test under /mock-llm/)

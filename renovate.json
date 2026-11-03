@@ -1,30 +1,141 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
-  "description": "Dependency watch (ROADMAP R17). One PR per ecosystem, root and example projects together, so an SDK update is tested by the library tests and the examples at once. Each SDK PR follows the playbook in CLAUDE.md › SDK updates.",
-  "ignorePaths": ["**/node_modules/**"],
+  "extends": [
+    "config:recommended"
+  ],
+  "description": "Dependency watch (ROADMAP R17). One PR per ecosystem, root and example projects together, so an SDK update is tested by the library tests and the examples at once. Each SDK PR follows the playbook in CLAUDE.md \u203a SDK updates.",
+  "ignorePaths": [
+    "**/node_modules/**"
+  ],
   "timezone": "Europe/London",
-  "schedule": ["before 7am on monday"],
+  "schedule": [
+    "before 7am on monday"
+  ],
   "prConcurrentLimit": 10,
-  "labels": ["dependencies"],
-  "lockFileMaintenance": { "enabled": true, "schedule": ["before 7am on monday"] },
+  "labels": [
+    "dependencies"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 7am on monday"
+    ]
+  },
   "packageRules": [
     {
       "description": "Peer ranges are a support claim (compat/targets.json), changed by hand when a floor moves, never bumped automatically",
-      "matchDepTypes": ["peerDependencies"],
+      "matchDepTypes": [
+        "peerDependencies"
+      ],
       "enabled": false
     },
-    { "description": "Everything else in the example projects", "matchFileNames": ["examples/**"], "groupName": "example projects" },
-    { "matchPackageNames": ["openai"], "groupName": "OpenAI SDK", "addLabels": ["sdk-update"] },
-    { "matchPackageNames": ["@anthropic-ai/**"], "groupName": "Anthropic SDK", "addLabels": ["sdk-update"] },
-    { "matchPackageNames": ["@google/genai", "google-auth-library"], "groupName": "Google GenAI SDK", "addLabels": ["sdk-update"] },
-    { "matchPackageNames": ["@aws-sdk/**", "@smithy/**"], "groupName": "AWS SDK", "addLabels": ["sdk-update"] },
-    { "matchPackageNames": ["vitest", "@vitest/**"], "groupName": "Vitest", "addLabels": ["framework-update"] },
-    { "matchPackageNames": ["jest", "@jest/**", "@types/jest"], "groupName": "Jest", "addLabels": ["framework-update"] },
-    { "matchPackageNames": ["@playwright/test", "playwright", "playwright-core"], "groupName": "Playwright (and browsers)", "addLabels": ["framework-update"] },
-    { "matchPackageNames": ["typescript"], "groupName": "TypeScript" },
-    { "matchPackageNames": ["@types/node"], "groupName": "Node.js types" },
-    { "matchPackageNames": ["@changesets/**"], "groupName": "Changesets" },
-    { "matchManagers": ["github-actions"], "groupName": "GitHub Actions" }
+    {
+      "description": "Everything else in the example projects",
+      "matchFileNames": [
+        "examples/**"
+      ],
+      "groupName": "example projects"
+    },
+    {
+      "matchPackageNames": [
+        "openai"
+      ],
+      "groupName": "OpenAI SDK",
+      "addLabels": [
+        "sdk-update"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "@anthropic-ai/**"
+      ],
+      "groupName": "Anthropic SDK",
+      "addLabels": [
+        "sdk-update"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "@google/genai",
+        "google-auth-library"
+      ],
+      "groupName": "Google GenAI SDK",
+      "addLabels": [
+        "sdk-update"
+      ]
+    },
+    {
+      "description": "google-auth-library must match the major @google/genai depends on (its auth client is passed to the SDK). Hold v11 until @google/genai depends on it: SDK update playbook, PR #9 (2026-10-06).",
+      "matchPackageNames": [
+        "google-auth-library"
+      ],
+      "allowedVersions": "<11"
+    },
+    {
+      "matchPackageNames": [
+        "@aws-sdk/**",
+        "@smithy/**"
+      ],
+      "groupName": "AWS SDK",
+      "addLabels": [
+        "sdk-update"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "vitest",
+        "@vitest/**"
+      ],
+      "groupName": "Vitest",
+      "addLabels": [
+        "framework-update"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "jest",
+        "@jest/**",
+        "@types/jest"
+      ],
+      "groupName": "Jest",
+      "addLabels": [
+        "framework-update"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "@playwright/test",
+        "playwright",
+        "playwright-core"
+      ],
+      "groupName": "Playwright (and browsers)",
+      "addLabels": [
+        "framework-update"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "typescript"
+      ],
+      "groupName": "TypeScript"
+    },
+    {
+      "matchPackageNames": [
+        "@types/node"
+      ],
+      "groupName": "Node.js types"
+    },
+    {
+      "matchPackageNames": [
+        "@changesets/**"
+      ],
+      "groupName": "Changesets"
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions"
+    }
   ]
 }

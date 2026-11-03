@@ -21,7 +21,7 @@ Proposed → In progress → Ready for sign-off → Signed off
    example path. Write the evidence next to the tick.
 4. **Standard criteria apply to every item** (from CLAUDE.md's definition of done):
    - tests (unit, plus contract tests through the official SDKs for anything on the wire)
-   - README + playground lesson and/or Reference updated
+   - README or `docs/` guide + playground lesson and/or Reference updated
    - example project updated or added where it helps someone get started
    - `npm run check` green
 5. **Stop at `Ready for sign-off`.** Post a sign-off summary listing each criterion with its evidence, plus anything
@@ -30,6 +30,10 @@ Proposed → In progress → Ready for sign-off → Signed off
    On "changes requested", record the requested changes under the item and go back to `In progress`.
 7. **No silent scope creep.** New ideas or gaps found mid-item become new roadmap items or recorded amendments, never
    unplanned additions to the current item.
+
+**Note (2026-11-03):** the README's reference sections moved to `docs/` (setup, scripting, failures, assertions),
+unchanged apart from links. Evidence below that cites "README § X" now refers to the same section in `docs/`. The README
+keeps the Scope (R1), Compatibility (R17) and Example projects (R19) sections.
 
 Item template:
 
@@ -934,6 +938,25 @@ domain; versioned docs per release (only the latest release is published).
 - [ ] Other providers: documented as Gemini-only (no equivalent wire field), so the stop reason falls back to `max_tokens` there
 - [ ] Contract tests through `@google/genai` ≥ 2.26.0, gated with `sdkAtLeast` for the matrix floor
 - [ ] Standard criteria: README + playground lesson variant + an example use (the coverage gate will require one)
+
+**Amendments:** none
+
+### R22. Anthropic API 2026-10-21: thinking modes, fast mode, model lifecycle
+**Status:** Proposed (from the SDK update playbook, Renovate PR #23: `@anthropic-ai/sdk` 0.131.0 → 1.4.0)
+**Depends on:** none
+**Goal:** apps on SDK 1.x can test the behaviour the new API version adds. PR #23 already renders the new fields the 1.x
+types declare as always present (`usage.speed`, and `lifecycle` / `line` / `deprecated_at` / `retires_at` on
+models); this item covers behaviour.
+
+**Draft acceptance criteria** (to be agreed before work starts; confirm each wire shape from the SDK source and API docs)
+- [ ] Thinking config: `thinking: { type: 'disabled' }` suppresses scripted `{ thinking }` blocks; `between_tools` emits
+      them only where the API does (confirm from the docs first)
+- [ ] Fast mode: a `speed` request matcher (`when({ speed: 'fast' })`, YAML too), recorded in the journal
+- [ ] Model lifecycle: the `models` option can mark a model `deprecated` / `retired` (with `retiresAt`); `models.list`
+      honours the `lifecycle` filter; a request naming a retired model gets the API's native error
+- [ ] `capabilities` on model objects (keys always present, per the 1.x types)
+- [ ] Contract tests through `@anthropic-ai/sdk` ≥ 1.0, SDK-side assertions gated with `sdkAtLeast` for the 0.66.0 floor
+- [ ] Standard criteria: docs + playground lesson variant + an example use (the coverage gate will require one)
 
 **Amendments:** none
 
