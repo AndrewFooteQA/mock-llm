@@ -919,7 +919,7 @@ async function renderReference() {
     <h2 id="Endpoints">Base URLs & endpoints</h2>
     <table class="grid"><tbody>
       ${row('mock.urls.openai', '<code>/v1/chat/completions</code>, <code>/v1/responses</code>, <code>/v1/embeddings</code>, <code>/v1/models</code>')}
-      ${row('mock.urls.anthropic', '<code>/v1/messages</code>, <code>/v1/messages/count_tokens</code>, <code>/v1/models</code>')}
+      ${row('mock.urls.anthropic', '<code>/v1/messages</code>, <code>/v1/messages/count_tokens</code>, <code>/v1/models</code>. Responses carry the fields SDK 1.x (API 2026-10-21) types as always present: <code>usage.speed</code> (<code>standard</code>, or <code>fast</code> when requested) and, on models, <code>lifecycle: \'active\'</code>, <code>line</code>, <code>deprecated_at</code>, <code>retires_at</code>')}
       ${row('mock.urls.gemini', '<code>/v1beta/models/{m}:generateContent | streamGenerateContent | countTokens | embedContent</code>, plus Vertex paths (incl. <code>:predict</code> embeddings)')}
       ${row('mock.urls.bedrock', '<code>/model/{id}/converse | converse-stream | invoke | invoke-with-response-stream | count-tokens</code>')}
     </tbody></table>

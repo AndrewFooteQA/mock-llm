@@ -78,7 +78,17 @@ export const anthropicAdapter: Adapter = {
     if (req.endpoint === 'count_tokens') {
       return { status: 200, headers: requestId(ctx), body: { input_tokens: ctx.usage.inputTokens } };
     }
-    const model = (id: string) => ({ type: 'model', id, display_name: id, created_at: '2025-01-01T00:00:00Z' });
+    // SDK ≥ 1.0 (API 2026-10-21) types lifecycle, line, deprecated_at and retires_at as always present.
+    const model = (id: string) => ({
+      type: 'model',
+      id,
+      display_name: id,
+      created_at: '2025-01-01T00:00:00Z',
+      lifecycle: 'active',
+      line: modelLine(id),
+      deprecated_at: null,
+      retires_at: null,
+    });
     if (req.model) {
       if (!ctx.models.includes(req.model)) throw new ApiError({ kind: 'not_found', message: `model: ${req.model}` });
       return { status: 200, headers: requestId(ctx), body: model(req.model) };
@@ -146,7 +156,7 @@ export function anthropicMessage(req: IRRequest, res: IRResponse, ctx: RenderCon
     stop_reason: STOP[stop],
     stop_sequence: null,
     stop_details: stopDetails(stop, res),
-    usage: usage(ctx),
+    usage: usage(req, ctx),
   };
 }
 
@@ -165,7 +175,7 @@ export function anthropicStreamEvents(req: IRRequest, res: IRResponse, ctx: Rend
       content: [],
       stop_reason: null,
       stop_sequence: null,
-      usage: { ...usage(ctx), output_tokens: 1 },
+      usage: { ...usage(req, ctx), output_tokens: 1 },
     },
   });
   res.content.forEach((c, index) => {
@@ -220,13 +230,22 @@ function block(c: IRContent, rng: Rng, streaming: boolean): Record<string, unkno
   return { type: 'tool_use', id: c.id ?? `toolu_${rng.id(24)}`, name: c.name, input: streaming ? {} : input };
 }
 
-function usage(ctx: RenderContext) {
+/** A Claude model line (`opus`, `sonnet`, …) from a first-party id like claude-opus-5-5; null for anything else. */
+function modelLine(id: string): string | null {
+  if (!id.startsWith('claude-')) return null;
+  return ['haiku', 'sonnet', 'opus', 'fable', 'mythos'].find((line) => id.split('-').includes(line)) ?? null;
+}
+
+function usage(req: IRRequest, ctx: RenderContext) {
   return {
     input_tokens: ctx.usage.inputTokens,
     output_tokens: ctx.usage.outputTokens,
     cache_creation_input_tokens: ctx.usage.cacheCreationInputTokens ?? 0,
     cache_read_input_tokens: ctx.usage.cacheReadInputTokens ?? 0,
     service_tier: 'standard',
+    // The speed mode the request ran in. SDK ≥ 1.0 types it as always present on first-party usage; not sent on
+    // Bedrock, whose Claude bodies don't document it.
+    ...(req.provider === 'anthropic' && { speed: req.raw?.speed === 'fast' ? 'fast' : 'standard' }),
   };
 }
 

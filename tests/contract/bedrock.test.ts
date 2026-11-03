@@ -91,6 +91,7 @@ describe('bedrock: InvokeModel (model-native bodies)', () => {
     mock.when({}).reply('Claude via Bedrock');
     const r = await invoke(CLAUDE, { anthropic_version: 'bedrock-2023-05-31', max_tokens: 100, messages: [{ role: 'user', content: 'hi' }] });
     expect(r).toMatchObject({ type: 'message', content: [{ type: 'text', text: 'Claude via Bedrock' }], stop_reason: 'end_turn' });
+    expect(r.usage).not.toHaveProperty('speed'); // first-party only (API 2026-10-21); Bedrock doesn't document it
   });
 
   it('rejects a Claude body without anthropic_version', async () => {
