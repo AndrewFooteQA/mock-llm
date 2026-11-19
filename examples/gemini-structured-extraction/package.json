@@ -6,7 +6,7 @@
     "test": "tsc --noEmit && vitest run"
   },
   "dependencies": {
-    "@google/genai": "^2.25.0"
+    "@google/genai": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
